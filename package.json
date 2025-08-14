@@ -3,25 +3,36 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev -p 3000",
+    "dev:3000": "next dev -p 3000",
+    "dev:3001": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@heroicons/react": "^2.1.2",
+    "@supabase/supabase-js": "^2.50.0",
+    "axios": "^1.6.8",
+    "date-fns": "^3.6.0",
+    "next": "15.2.5",
     "react": "^19.0.0",
+    "react-csv": "^2.2.2",
     "react-dom": "^19.0.0",
-    "next": "15.2.5"
+    "react-query": "^3.39.3",
+    "react-toastify": "^10.0.4",
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
+    "@types/react-csv": "^1.1.10",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "15.2.5",
-    "@eslint/eslintrc": "^3"
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }
