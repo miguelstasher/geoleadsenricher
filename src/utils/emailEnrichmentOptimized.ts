@@ -279,7 +279,7 @@ async function searchEmailsAWSLambda(website: string, businessName: string): Pro
   }
 }
 
-// 5. Optimized Email Enrichment with Parallel Processing
+// 5. Optimized Email Enrichment with Reliable Fallback
 export async function enrichLeadEmailOptimized(lead: Lead): Promise<EmailEnrichmentResult> {
   console.log(`\n🎯 Starting optimized enrichment for: ${lead.name} (${lead.website})`);
 
@@ -293,49 +293,58 @@ export async function enrichLeadEmailOptimized(lead: Lead): Promise<EmailEnrichm
     };
   }
 
-  // Try all services in parallel for maximum speed
-  const promises = [
-    searchEmailsHunter(lead.website).catch(error => ({ error: 'hunter', message: error.message })),
-    searchEmailsSnov(lead.website).catch(error => ({ error: 'snov', message: error.message })),
-    searchEmailsAWSLambda(lead.website, lead.name).catch(error => ({ error: 'lambda', message: error.message }))
-  ];
-
+  // Step 1: Try AWS Lambda Scraper (Primary) - Fastest
   try {
-    const results = await Promise.allSettled(promises);
-    
-    // Process results in order of preference: Hunter.io > Snov.io > AWS Lambda
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i];
-      
-      if (result.status === 'fulfilled' && !('error' in result.value) && result.value.email) {
-        console.log(`✅ Success with service ${i + 1}: ${result.value.email}`);
-        return result.value;
-      }
+    console.log(`1️⃣ Trying AWS Lambda for: ${lead.website}`);
+    const lambdaResult = await searchEmailsAWSLambda(lead.website, lead.name);
+    if (lambdaResult.email) {
+      console.log(`✅ Success with AWS Lambda: ${lambdaResult.email}`);
+      return lambdaResult;
     }
-
-    // No email found anywhere
-    console.log(`❌ No email found for: ${lead.name} after trying all sources`);
-    return {
-      email: 'not_found',
-      email_status: 'not_found',
-      source: 'none'
-    };
-
   } catch (error: any) {
-    console.error(`❌ Error in parallel enrichment for ${lead.name}:`, error);
-    return {
-      email: 'not_found',
-      email_status: 'not_found',
-      source: 'none'
-    };
+    console.log(`⚠️  AWS Lambda failed: ${error.message}`);
   }
+  await sleep(300); // Reduced delay
+
+  // Step 2: Try Hunter.io (Secondary) - Most reliable
+  try {
+    console.log(`2️⃣ Trying Hunter.io for: ${lead.website}`);
+    const hunterResult = await searchEmailsHunter(lead.website);
+    if (hunterResult.email) {
+      console.log(`✅ Success with Hunter.io: ${hunterResult.email}`);
+      return hunterResult;
+    }
+  } catch (error: any) {
+    console.log(`⚠️  Hunter.io failed: ${error.message}`);
+  }
+  await sleep(300); // Reduced delay
+
+  // Step 3: Try Snov.io (Tertiary) - Backup
+  try {
+    console.log(`3️⃣ Trying Snov.io for: ${lead.website}`);
+    const snovResult = await searchEmailsSnov(lead.website);
+    if (snovResult.email) {
+      console.log(`✅ Success with Snov.io: ${snovResult.email}`);
+      return snovResult;
+    }
+  } catch (error: any) {
+    console.log(`⚠️  Snov.io failed: ${error.message}`);
+  }
+
+  // No email found anywhere
+  console.log(`❌ No email found for: ${lead.name} after trying all sources`);
+  return {
+    email: 'not_found',
+    email_status: 'not_found',
+    source: 'none'
+  };
 }
 
 // 6. Optimized Batch Processing with Concurrency Control
 export async function enrichLeadsBatchOptimized(
   leads: Lead[], 
   onProgress?: (progress: {completed: number, total: number, currentLead: string}) => void,
-  concurrency: number = 3 // Process 3 leads simultaneously
+  concurrency: number = 2 // Process 2 leads simultaneously for reliability
 ): Promise<EmailEnrichmentResult[]> {
   const results: EmailEnrichmentResult[] = [];
   
@@ -382,9 +391,9 @@ export async function enrichLeadsBatchOptimized(
       results[index] = result;
     });
 
-    // Minimal delay between batches (reduced from 2 seconds to 500ms)
+    // Conservative delay between batches for reliability
     if (i + concurrency < leads.length) {
-      await sleep(500);
+      await sleep(800);
     }
   }
   
@@ -405,7 +414,7 @@ export async function enrichLeadsBatchOptimized(
 export async function enrichLeadsBatchUltraFast(
   leads: Lead[], 
   onProgress?: (progress: {completed: number, total: number, currentLead: string}) => void,
-  concurrency: number = 5 // Process 5 leads simultaneously
+  concurrency: number = 3 // Process 3 leads simultaneously for balance
 ): Promise<EmailEnrichmentResult[]> {
   const results: EmailEnrichmentResult[] = [];
   
