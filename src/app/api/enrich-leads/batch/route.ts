@@ -76,21 +76,14 @@ export async function POST(request: NextRequest) {
 
       console.log(`🔍 Job ${jobId}: Processing result for ${lead.name}:`, result);
 
-      if (result && result.email && 
-          result.email !== 'not_found' && 
-          result.email !== 'No email found' && 
-          result.email !== 'Unknown' &&
-          !result.email.toLowerCase().includes('no email') &&
-          !result.email.toLowerCase().includes('not found') &&
-          !result.email.toLowerCase().includes('unknown') &&
-          result.email.includes('@')) {
-        
+      // Simple check - if we have a valid email, update the database
+      if (result && result.email && result.email !== 'not_found' && result.email.includes('@')) {
         // Update lead with enriched email
         const { error: updateError } = await supabase
           .from('leads')
           .update({
             email: result.email,
-            email_status: result.email_status,
+            email_status: result.email_status || 'verified',
             last_modified: new Date().toISOString().slice(0, 16).replace('T', ' ')
           })
           .eq('id', lead.id);
@@ -102,7 +95,7 @@ export async function POST(request: NextRequest) {
           console.log(`✅ Job ${jobId}: Updated lead ${lead.name} with email: ${result.email}`);
           updatedCount++;
         }
-      } else if (result && result.email_status === 'not_found') {
+      } else {
         // Update lead with not_found status
         const { error: updateError } = await supabase
           .from('leads')
@@ -122,7 +115,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const successfulEmails = results.filter(r => r.email && r.email !== 'not_found').length;
+    const successfulEmails = results.filter(r => r.email && r.email !== 'not_found' && r.email.includes('@')).length;
 
     console.log(`✅ Job ${jobId} completed: ${updatedCount} updated, ${errorCount} errors, ${successfulEmails} emails found`);
 

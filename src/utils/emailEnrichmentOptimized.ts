@@ -14,13 +14,9 @@ export async function enrichLeadEmailOptimized(lead: any): Promise<any> {
     // Step 1: Try AWS Lambda scraper first (most reliable)
     console.log(`  📡 Step 1: Trying AWS Lambda scraper...`);
     const lambdaResult = await tryAWSLambdaScraper(website, name);
-    console.log(`  📋 Lambda result:`, lambdaResult);
-    
-    if (lambdaResult && lambdaResult.email && lambdaResult.email !== 'not_found' && lambdaResult.email !== 'No email found' && lambdaResult.email !== 'Unknown') {
+    if (lambdaResult && lambdaResult.email && lambdaResult.email !== 'not_found') {
       console.log(`  ✅ AWS Lambda found: ${lambdaResult.email}`);
       return { ...lead, email: lambdaResult.email, email_status: 'verified' };
-    } else {
-      console.log(`  ❌ AWS Lambda did not find valid email`);
     }
 
     // Step 2: Try Hunter.io
@@ -50,7 +46,7 @@ export async function enrichLeadEmailOptimized(lead: any): Promise<any> {
   }
 }
 
-// AWS Lambda scraper function
+// AWS Lambda scraper function - SIMPLE VERSION THAT WORKS
 async function tryAWSLambdaScraper(website: string, name: string): Promise<any> {
   try {
     console.log(`  🔗 Calling AWS Lambda for: ${website}`);
@@ -66,32 +62,19 @@ async function tryAWSLambdaScraper(website: string, name: string): Promise<any> 
           'Authorization': `Bearer ${process.env.AWS_LAMBDA_AUTH_TOKEN}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000 // 30 second timeout
+        timeout: 30000
       }
     );
 
     console.log(`  📥 AWS Lambda response:`, response.data);
 
-    // Check if response has email in the expected format
-    if (response.data && response.data.email && response.data.email !== 'not_found' && response.data.email !== 'No email found' && response.data.email !== 'Unknown') {
+    // Simple check - if response has email, use it
+    if (response.data && response.data.email && response.data.email !== 'not_found') {
       console.log(`  ✅ AWS Lambda found email: ${response.data.email}`);
       return { email: response.data.email, email_status: 'verified' };
     }
 
-    // Check if response body is a string that needs parsing
-    if (response.data && typeof response.data === 'string') {
-      try {
-        const parsedBody = JSON.parse(response.data);
-        if (parsedBody.email && parsedBody.email !== 'not_found' && parsedBody.email !== 'No email found' && parsedBody.email !== 'Unknown') {
-          console.log(`  ✅ AWS Lambda found email (parsed): ${parsedBody.email}`);
-          return { email: parsedBody.email, email_status: 'verified' };
-        }
-      } catch (parseError) {
-        console.log(`  ⚠️ Could not parse response body:`, response.data);
-      }
-    }
-
-    console.log(`  ❌ AWS Lambda: No valid email found in response`);
+    console.log(`  ❌ AWS Lambda: No valid email found`);
     return null;
   } catch (error) {
     console.error('AWS Lambda error:', error);
