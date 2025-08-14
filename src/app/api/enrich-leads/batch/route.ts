@@ -64,6 +64,8 @@ export async function POST(request: NextRequest) {
       }
     }, batchSize);
 
+    console.log(`📋 Job ${jobId}: Enrichment results:`, results);
+
     // Update database with results
     let updatedCount = 0;
     let errorCount = 0;
@@ -71,6 +73,8 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < leadsToEnrich.length; i++) {
       const lead = leadsToEnrich[i];
       const result = results[i];
+
+      console.log(`🔍 Job ${jobId}: Processing result for ${lead.name}:`, result);
 
       if (result && result.email && 
           result.email !== 'not_found' && 
