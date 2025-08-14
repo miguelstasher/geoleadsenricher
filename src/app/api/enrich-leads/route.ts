@@ -98,11 +98,12 @@ async function processEnrichmentJob(jobId: string, leads: any[]) {
   try {
     console.log(`🚀 Starting background enrichment job ${jobId} for ${leads.length} leads`);
 
-    // Process leads in batch with progress tracking
+    // Process leads using the original working enrichment function
     const results = await enrichLeadsBatch(leads, (progress) => {
       const currentJob = enrichmentJobs.get(jobId);
       if (currentJob && currentJob.status === 'running') {
         currentJob.progress = progress;
+        console.log(`📈 Progress update for job ${jobId}:`, progress);
         
         // Update estimated completion time based on actual progress
         if (progress.completed > 0) {
@@ -113,6 +114,8 @@ async function processEnrichmentJob(jobId: string, leads: any[]) {
       }
     });
 
+    console.log(`📋 Enrichment results for job ${jobId}:`, results);
+
     // Check if job was cancelled during processing
     const finalJob = enrichmentJobs.get(jobId);
     if (!finalJob || finalJob.status === 'cancelled') {
@@ -120,10 +123,21 @@ async function processEnrichmentJob(jobId: string, leads: any[]) {
       return;
     }
 
+    console.log(`💾 Starting database updates for job ${jobId}...`);
+
     // Update database with results
+    let updatedCount = 0;
+    let errorCount = 0;
+    
     for (let i = 0; i < leads.length; i++) {
       const lead = leads[i];
       const result = results[i];
+      
+      console.log(`🔍 Processing lead ${i + 1}/${leads.length}: ${lead.name}`, {
+        leadId: lead.id,
+        resultEmail: result?.email,
+        resultStatus: result?.email_status
+      });
       
       if (result && result.email && 
           result.email !== 'not_found' && 
@@ -145,8 +159,10 @@ async function processEnrichmentJob(jobId: string, leads: any[]) {
 
         if (updateError) {
           console.error(`❌ Failed to update lead ${lead.id}:`, updateError);
+          errorCount++;
         } else {
           console.log(`✅ Updated lead ${lead.name} with email: ${result.email}`);
+          updatedCount++;
         }
       } else if (result && result.email_status === 'not_found') {
         // Update lead with not_found status
@@ -160,23 +176,36 @@ async function processEnrichmentJob(jobId: string, leads: any[]) {
 
         if (updateError) {
           console.error(`❌ Failed to update lead ${lead.id} status:`, updateError);
+          errorCount++;
         } else {
           console.log(`📝 Updated lead ${lead.name} status: not_found`);
+          updatedCount++;
         }
+      } else {
+        console.log(`⚠️ Skipping lead ${lead.name} - no valid result`);
       }
     }
+
+    console.log(`📊 Database update summary for job ${jobId}:`, {
+      totalLeads: leads.length,
+      updatedCount,
+      errorCount,
+      skippedCount: leads.length - updatedCount - errorCount
+    });
 
     // Mark job as completed
     if (finalJob) {
       finalJob.status = 'completed';
       finalJob.results = results;
       finalJob.progress.currentLead = 'Completed';
+      finalJob.progress.completed = leads.length;
     }
 
     console.log(`✅ Enrichment job ${jobId} completed successfully`);
 
   } catch (error: any) {
     console.error(`❌ Enrichment job ${jobId} failed:`, error);
+    
     const job = enrichmentJobs.get(jobId);
     if (job) {
       job.status = 'error';
@@ -185,71 +214,60 @@ async function processEnrichmentJob(jobId: string, leads: any[]) {
   }
 }
 
-// GET request to check job status
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const jobId = searchParams.get('jobId');
+  try {
+    const { searchParams } = new URL(request.url);
+    const jobId = searchParams.get('jobId');
 
-  if (!jobId) {
-    return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
+    if (!jobId) {
+      return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
+    }
+
+    const job = enrichmentJobs.get(jobId);
+    
+    if (!job) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      status: job.status,
+      progress: job.progress,
+      results: job.results,
+      error: job.error,
+      startTime: job.startTime,
+      estimatedCompletionTime: job.estimatedCompletionTime
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching job status:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
-  const job = enrichmentJobs.get(jobId);
-  if (!job) {
-    return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-  }
-
-  // Calculate progress percentage and time estimates
-  const progressPercentage = job.progress.total > 0 
-    ? Math.round((job.progress.completed / job.progress.total) * 100)
-    : 0;
-
-  const timeElapsed = Date.now() - job.startTime;
-  const estimatedTimeRemaining = job.estimatedCompletionTime 
-    ? Math.max(0, job.estimatedCompletionTime - Date.now())
-    : 0;
-
-  return NextResponse.json({
-    jobId,
-    status: job.status,
-    progress: {
-      ...job.progress,
-      percentage: progressPercentage,
-      timeElapsedMs: timeElapsed,
-      timeElapsedMinutes: Math.round(timeElapsed / 60000),
-      estimatedTimeRemainingMs: estimatedTimeRemaining,
-      estimatedTimeRemainingMinutes: Math.round(estimatedTimeRemaining / 60000)
-    },
-    results: job.status === 'completed' ? job.results : undefined,
-    error: job.error
-  });
 }
 
-// DELETE request to cancel job
 export async function DELETE(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const jobId = searchParams.get('jobId');
+  try {
+    const { searchParams } = new URL(request.url);
+    const jobId = searchParams.get('jobId');
 
-  if (!jobId) {
-    return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
-  }
+    if (!jobId) {
+      return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
+    }
 
-  const job = enrichmentJobs.get(jobId);
-  if (!job) {
-    return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-  }
-
-  if (job.status === 'running') {
-    job.status = 'cancelled';
-    console.log(`⏹️ Enrichment job ${jobId} cancelled by user`);
+    const job = enrichmentJobs.get(jobId);
     
-    return NextResponse.json({
-      success: true,
-      message: 'Enrichment job cancelled successfully'
-    });
-  } else {
-    return NextResponse.json({
-      error: `Cannot cancel job with status: ${job.status}`
-    }, { status: 400 });
+    if (!job) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    if (job.status === 'running') {
+      job.status = 'cancelled';
+      console.log(`⏹️ Enrichment job ${jobId} cancelled by user`);
+    }
+
+    return NextResponse.json({ success: true, message: 'Job cancelled successfully' });
+
+  } catch (error: any) {
+    console.error('Error cancelling job:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 } 
