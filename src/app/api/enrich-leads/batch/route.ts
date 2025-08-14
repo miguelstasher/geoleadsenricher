@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { enrichLeadsBatchOptimized } from '../../../../utils/emailEnrichmentOptimized';
+import { enrichmentJobs } from './status/route';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,7 +16,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lead IDs are required' }, { status: 400 });
     }
 
-    console.log(`🔄 Starting batch enrichment for ${leadIds.length} leads with batch size ${batchSize}`);
+    // Generate unique job ID
+    const jobId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    console.log(`🔄 Starting batch enrichment job ${jobId} for ${leadIds.length} leads with batch size ${batchSize}`);
 
     // Get leads from database
     const { data: leads, error: fetchError } = await supabase
@@ -36,11 +40,28 @@ export async function POST(request: NextRequest) {
       !lead.email || lead.email.trim() === '' || lead.email === 'Not Found' || lead.email === 'not_found'
     );
 
-    console.log(`📊 Processing ${leadsToEnrich.length} leads out of ${leads.length} total`);
+    console.log(`📊 Job ${jobId}: Processing ${leadsToEnrich.length} leads out of ${leads.length} total`);
+
+    // Initialize job status
+    enrichmentJobs.set(jobId, {
+      status: 'running',
+      progress: {
+        completed: 0,
+        total: leadsToEnrich.length,
+        currentLead: leadsToEnrich.length > 0 ? leadsToEnrich[0].name : 'None'
+      },
+      startTime: Date.now()
+    });
 
     // Process in small batches to avoid timeouts
     const results = await enrichLeadsBatchOptimized(leadsToEnrich, (progress) => {
-      console.log(`📈 Progress: ${progress.completed}/${progress.total} - ${progress.currentLead}`);
+      console.log(`📈 Job ${jobId} Progress: ${progress.completed}/${progress.total} - ${progress.currentLead}`);
+      
+      // Update job progress
+      const job = enrichmentJobs.get(jobId);
+      if (job) {
+        job.progress = progress;
+      }
     }, batchSize);
 
     // Update database with results
@@ -71,10 +92,10 @@ export async function POST(request: NextRequest) {
           .eq('id', lead.id);
 
         if (updateError) {
-          console.error(`❌ Failed to update lead ${lead.id}:`, updateError);
+          console.error(`❌ Job ${jobId}: Failed to update lead ${lead.id}:`, updateError);
           errorCount++;
         } else {
-          console.log(`✅ Updated lead ${lead.name} with email: ${result.email}`);
+          console.log(`✅ Job ${jobId}: Updated lead ${lead.name} with email: ${result.email}`);
           updatedCount++;
         }
       } else if (result && result.email_status === 'not_found') {
@@ -88,30 +109,56 @@ export async function POST(request: NextRequest) {
           .eq('id', lead.id);
 
         if (updateError) {
-          console.error(`❌ Failed to update lead ${lead.id} status:`, updateError);
+          console.error(`❌ Job ${jobId}: Failed to update lead ${lead.id} status:`, updateError);
           errorCount++;
         } else {
-          console.log(`📝 Updated lead ${lead.name} status: not_found`);
+          console.log(`📝 Job ${jobId}: Updated lead ${lead.name} status: not_found`);
           updatedCount++;
         }
       }
     }
 
-    console.log(`✅ Batch enrichment completed: ${updatedCount} updated, ${errorCount} errors`);
+    const successfulEmails = results.filter(r => r.email && r.email !== 'not_found').length;
+
+    console.log(`✅ Job ${jobId} completed: ${updatedCount} updated, ${errorCount} errors, ${successfulEmails} emails found`);
+
+    // Update job status to completed
+    const job = enrichmentJobs.get(jobId);
+    if (job) {
+      job.status = 'completed';
+      job.progress.completed = leadsToEnrich.length;
+      job.progress.currentLead = 'Completed';
+      job.results = {
+        total: leadsToEnrich.length,
+        updated: updatedCount,
+        errors: errorCount,
+        successfulEmails
+      };
+    }
 
     return NextResponse.json({
       success: true,
+      jobId,
       message: `Enrichment completed for ${leadsToEnrich.length} leads`,
       results: {
         total: leadsToEnrich.length,
         updated: updatedCount,
         errors: errorCount,
-        successfulEmails: results.filter(r => r.email && r.email !== 'not_found').length
+        successfulEmails
       }
     });
 
   } catch (error: any) {
     console.error('Error in batch enrichment:', error);
+    
+    // Update job status to error
+    const jobId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const job = enrichmentJobs.get(jobId);
+    if (job) {
+      job.status = 'error';
+      job.error = error.message;
+    }
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

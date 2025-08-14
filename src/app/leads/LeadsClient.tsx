@@ -7,6 +7,7 @@ import React from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useNotifications } from '../components/SimpleNotificationProvider';
 import EnrichmentNotification from '../components/EnrichmentNotification';
+import EnrichmentProgressNotification from '../components/EnrichmentProgressNotification';
 
 import { useSearchParams } from 'next/navigation';
 import RecordOwnerDisplay from '../components/RecordOwnerDisplay';
@@ -2177,18 +2178,13 @@ export default function LeadsPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Show completion message and refresh data
-        const successCount = data.results?.successfulEmails || 0;
-        setToastMessage(`✅ Enrichment completed! Found ${successCount} emails out of ${leadsToEnrich.length} leads.`);
+        // Start progress tracking with the new notification system
+        setEnrichmentJobId(data.jobId);
+        
+        // Show initial message
+        setToastMessage(`🔍 Enrichment started for ${leadsToEnrich.length} leads! Check the notification for progress.`);
         setIsToastVisible(true);
-        setTimeout(() => setIsToastVisible(false), 5000);
-        
-        // Refresh leads to show updated data
-        fetchLeads();
-        
-        // Clear selection
-        setSelectedLeads([]);
-        setSelectAll(false);
+        setTimeout(() => setIsToastVisible(false), 3000);
       } else {
         throw new Error(data.error || 'Failed to start enrichment');
       }
@@ -4655,14 +4651,23 @@ export default function LeadsPage() {
       </div>
       )}
 
-      {/* Enrichment Notification */}
+            {/* Enrichment Notification */}
       <EnrichmentNotification 
         jobId={enrichmentJobId}
         onComplete={handleEnrichmentComplete}
         onCancel={handleEnrichmentCancel}
       />
 
-
+      {/* Progress Notification */}
+      <EnrichmentProgressNotification 
+        jobId={enrichmentJobId}
+        onClose={() => {
+          setEnrichmentJobId(null);
+          fetchLeads(); // Refresh leads data
+          setSelectedLeads([]); // Clear selection
+          setSelectAll(false);
+        }}
+      />
 
       <Toast />
     </div>
