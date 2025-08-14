@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { enrichLeadsBatch } from '../../../utils/emailEnrichment';
+import { enrichLeadsBatchOptimized, enrichLeadsBatchUltraFast } from '../../../utils/emailEnrichmentOptimized';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,7 +24,7 @@ const enrichmentJobs = new Map<string, {
 
 export async function POST(request: NextRequest) {
   try {
-    const { leadIds } = await request.json();
+    const { leadIds, speedMode = 'optimized' } = await request.json();
 
     if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
       return NextResponse.json({ error: 'Lead IDs are required' }, { status: 400 });
@@ -62,11 +63,11 @@ export async function POST(request: NextRequest) {
         currentLead: leadsToEnrich.length > 0 ? leadsToEnrich[0].name : 'None'
       },
       startTime: Date.now(),
-      estimatedCompletionTime: Date.now() + (leadsToEnrich.length * 5000) // Estimate 5 seconds per lead
+      estimatedCompletionTime: Date.now() + (leadsToEnrich.length * 2000) // Estimate 2 seconds per lead (optimized)
     });
 
-    // Start background processing (don't await this)
-    processEnrichmentJob(jobId, leadsToEnrich).catch(error => {
+    // Start background processing with speed mode (don't await this)
+    processEnrichmentJob(jobId, leadsToEnrich, speedMode).catch(error => {
       console.error(`❌ Enrichment job ${jobId} failed:`, error);
       const job = enrichmentJobs.get(jobId);
       if (job) {
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
       message: `Enrichment started for ${leadsToEnrich.length} leads`,
       leadsToEnrich: leadsToEnrich.length,
       leadsSkipped: leads.length - leadsToEnrich.length,
-      estimatedTimeMinutes: Math.ceil(leadsToEnrich.length * 5 / 60)
+      estimatedTimeMinutes: Math.ceil(leadsToEnrich.length * 2 / 60) // Optimized time estimate
     });
 
   } catch (error: any) {
@@ -91,15 +92,16 @@ export async function POST(request: NextRequest) {
 }
 
 // Background processing function
-async function processEnrichmentJob(jobId: string, leads: any[]) {
+async function processEnrichmentJob(jobId: string, leads: any[], speedMode: string = 'optimized') {
   const job = enrichmentJobs.get(jobId);
   if (!job) return;
 
   try {
     console.log(`🚀 Starting background enrichment job ${jobId} for ${leads.length} leads`);
 
-    // Process leads in batch with progress tracking
-    const results = await enrichLeadsBatch(leads, (progress) => {
+    // Process leads in batch with speed-optimized enrichment
+    const enrichmentFunction = speedMode === 'ultra-fast' ? enrichLeadsBatchUltraFast : enrichLeadsBatchOptimized;
+    const results = await enrichmentFunction(leads, (progress) => {
       const currentJob = enrichmentJobs.get(jobId);
       if (currentJob && currentJob.status === 'running') {
         currentJob.progress = progress;
