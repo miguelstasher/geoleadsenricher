@@ -10,7 +10,7 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const { leadIds, batchSize = 2 } = await request.json();
+    const { leadIds, batchSize = 1 } = await request.json();
 
     if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
       return NextResponse.json({ error: 'Lead IDs are required' }, { status: 400 });

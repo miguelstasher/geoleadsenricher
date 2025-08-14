@@ -2172,7 +2172,7 @@ export default function LeadsPage() {
         },
         body: JSON.stringify({
           leadIds: leadsToEnrich.map(lead => lead.id),
-          batchSize: 2 // Process 2 leads at a time for reliability
+          batchSize: 1 // Process 1 lead at a time for thoroughness
         })
       });
 

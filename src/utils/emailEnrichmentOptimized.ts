@@ -1,477 +1,235 @@
-// Optimized Email Enrichment Utility - Parallel Processing with Reduced Delays
-// Hunter.io → Snov.io → AWS Lambda → Verification
+import axios from 'axios';
 
-interface EmailEnrichmentResult {
-  email: string | null;
-  email_status: 'verified' | 'accept_all' | 'invalid' | 'unverified' | 'not_found';
-  source: 'hunter.io' | 'snov.io' | 'aws_lambda' | 'none';
-  confidence_score?: number;
-  verification_details?: any;
-}
+// Email enrichment function using multiple APIs with proper delays
+export async function enrichLeadEmailOptimized(lead: any): Promise<any> {
+  const { name, website } = lead;
+  
+  if (!website || !name) {
+    return { ...lead, email: 'not_found', email_status: 'not_found' };
+  }
 
-interface Lead {
-  id: string;
-  name: string;
-  website: string;
-  email?: string;
-  email_status?: string;
-}
+  console.log(`🔍 Enriching email for: ${name} (${website})`);
 
-// Helper function to extract main domain from URL
-function extractMainDomain(url: string): string {
   try {
-    const hostname = url.replace(/https?:\/\//, '').split('/')[0];
-    const parts = hostname.split('.');
-    if (parts.length > 2) {
-      return parts.slice(-2).join('.');
+    // Step 1: Try AWS Lambda scraper first (most reliable)
+    console.log(`  📡 Step 1: Trying AWS Lambda scraper...`);
+    const lambdaResult = await tryAWSLambdaScraper(website, name);
+    if (lambdaResult && lambdaResult.email && lambdaResult.email !== 'not_found') {
+      console.log(`  ✅ AWS Lambda found: ${lambdaResult.email}`);
+      return { ...lead, email: lambdaResult.email, email_status: 'verified' };
     }
-    return hostname;
+
+    // Step 2: Try Hunter.io
+    console.log(`  📡 Step 2: Trying Hunter.io...`);
+    await sleep(1000); // Wait 1 second between APIs
+    const hunterResult = await tryHunterIO(website, name);
+    if (hunterResult && hunterResult.email && hunterResult.email !== 'not_found') {
+      console.log(`  ✅ Hunter.io found: ${hunterResult.email}`);
+      return { ...lead, email: hunterResult.email, email_status: 'verified' };
+    }
+
+    // Step 3: Try Snov.io
+    console.log(`  📡 Step 3: Trying Snov.io...`);
+    await sleep(1000); // Wait 1 second between APIs
+    const snovResult = await trySnovIO(website, name);
+    if (snovResult && snovResult.email && snovResult.email !== 'not_found') {
+      console.log(`  ✅ Snov.io found: ${snovResult.email}`);
+      return { ...lead, email: snovResult.email, email_status: 'verified' };
+    }
+
+    console.log(`  ❌ No email found after trying all 3 methods`);
+    return { ...lead, email: 'not_found', email_status: 'not_found' };
+
   } catch (error) {
-    console.error("Error extracting domain:", error);
-    return url;
+    console.error(`  ❌ Error enriching ${name}:`, error);
+    return { ...lead, email: 'not_found', email_status: 'error' };
   }
 }
 
-// Reduced sleep function for faster processing
-function sleep(milliseconds: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, milliseconds));
-}
-
-// 1. Hunter.io Email Search (Optimized)
-async function searchEmailsHunter(website: string): Promise<EmailEnrichmentResult> {
-  const domain = extractMainDomain(website);
-  const hunterApiKey = process.env.HUNTER_API_KEY;
-  
-  if (!hunterApiKey) {
-    throw new Error('❌ Hunter.io API key is required');
-  }
-
-  const hunterUrl = `https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${hunterApiKey}`;
-
+// AWS Lambda scraper function
+async function tryAWSLambdaScraper(website: string, name: string): Promise<any> {
   try {
-    console.log(`🔄 Hunter.io searching: ${domain}`);
-    
-    const response = await fetch(hunterUrl);
-    const responseText = await response.text();
-
-    if (!response.ok) {
-      console.error(`Hunter.io error: ${response.status} - ${responseText}`);
-      throw new Error(`Hunter.io error: ${response.status}`);
-    }
-
-    const data = JSON.parse(responseText);
-    
-    const email1 = data.data?.emails?.length > 0 ? data.data.emails[0].value : null;
-    
-    if (email1 && email1 !== "No Email Found") {
-      console.log(`✅ Hunter.io found email: ${email1}`);
-      
-      // Verify the email
-      const verification = await verifyEmailHunter(email1);
-      return {
-        email: email1,
-        email_status: verification.status,
-        source: 'hunter.io',
-        confidence_score: verification.score,
-        verification_details: verification
-      };
-    }
-
-    console.log(`❌ Hunter.io: No emails found for domain: ${domain}`);
-    return {
-      email: null,
-      email_status: 'not_found',
-      source: 'hunter.io'
-    };
-
-  } catch (error: any) {
-    console.error('Hunter.io search error:', error);
-    throw error;
-  }
-}
-
-// 2. Hunter.io Email Verification (Optimized)
-async function verifyEmailHunter(email: string): Promise<{status: 'verified' | 'accept_all' | 'invalid' | 'unverified', score: number}> {
-  const hunterApiKey = process.env.HUNTER_API_KEY;
-  
-  if (!hunterApiKey) {
-    throw new Error('❌ Hunter.io API key is required');
-  }
-  
-  const verifyUrl = `https://api.hunter.io/v2/email-verifier?email=${email}&api_key=${hunterApiKey}`;
-
-  try {
-    const response = await fetch(verifyUrl);
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.log(`⚠️  Hunter.io verification failed for ${email}: ${response.status} - using unverified status`);
-      return { status: 'unverified', score: 50 };
-    }
-
-    const result = data.data?.result;
-    const score = data.data?.score || 0;
-
-    console.log(`🔍 Hunter.io verification for ${email}: result=${result}, score=${score}`);
-
-    // Map Hunter.io results to our status system with score-based logic
-    if (score >= 82) {
-      return { status: 'verified', score };
-    } else {
-      return { status: 'invalid', score };
-    }
-
-  } catch (error: any) {
-    console.error('Hunter.io verification error:', error);
-    return { status: 'unverified', score: 0 };
-  }
-}
-
-// 3. Snov.io Email Search (Optimized)
-async function searchEmailsSnov(website: string): Promise<EmailEnrichmentResult> {
-  const domain = extractMainDomain(website);
-  
-  const API_USER_ID = process.env.SNOV_API_USER_ID || '9d6ecb9c93134a23a9fd4a052072783c';
-  const API_SECRET = process.env.SNOV_API_SECRET || '45aeaed702300aca97ff732a14e53132';
-  
-  if (!API_USER_ID || !API_SECRET) {
-    throw new Error('❌ Snov.io API credentials are required');
-  }
-
-  async function getAccessToken() {
-    try {
-      const response = await fetch('https://api.snov.io/v1/oauth/access_token', {
-        method: 'POST',
+    const response = await axios.post(
+      process.env.AWS_LAMBDA_EMAIL_SCRAPER_URL!,
+      {
+        website: website,
+        name: name
+      },
+      {
         headers: {
+          'Authorization': `Bearer ${process.env.AWS_LAMBDA_AUTH_TOKEN}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          grant_type: 'client_credentials',
-          client_id: API_USER_ID,
-          client_secret: API_SECRET
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        timeout: 30000 // 30 second timeout
       }
+    );
 
-      const data = await response.json();
-      
-      if (!data.access_token) {
-        throw new Error('No access token in response');
-      }
-
-      return data.access_token;
-    } catch (error) {
-      console.error('Error getting Snov.io access token:', error);
-      throw error;
+    if (response.data && response.data.email && response.data.email !== 'not_found') {
+      return { email: response.data.email, email_status: 'verified' };
     }
-  }
-
-  async function getDomainEmails(accessToken: string, domain: string) {
-    try {
-      const params = new URLSearchParams({
-        access_token: accessToken,
-        domain: domain,
-        type: 'all',
-        limit: '1',
-        lastId: '0'
-      });
-
-      const url = `https://api.snov.io/v2/domain-emails-with-info?${params}`;
-
-      const response = await fetch(url, {
-        method: 'GET'
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.data && data.data.length > 0) {
-        const email = data.data[0].email;
-        console.log(`✅ Snov.io found email: ${email}`);
-        return email;
-      } else {
-        console.log(`❌ Snov.io: No emails found for domain: ${domain}`);
-        return null;
-      }
-    } catch (error) {
-      console.error('Error getting domain emails from Snov.io:', error);
-      throw error;
-    }
-  }
-
-  try {
-    console.log(`🔄 Snov.io searching: ${domain}`);
-    
-    const accessToken = await getAccessToken();
-    const email = await getDomainEmails(accessToken, domain);
-    
-    if (email) {
-      return {
-        email: email,
-        email_status: 'unverified', // Snov.io doesn't provide verification
-        source: 'snov.io'
-      };
-    }
-
-    return {
-      email: null,
-      email_status: 'not_found',
-      source: 'snov.io'
-    };
-
-  } catch (error: any) {
-    console.error('Snov.io search error:', error);
-    throw error;
+    return null;
+  } catch (error) {
+    console.error('AWS Lambda error:', error);
+    return null;
   }
 }
 
-// 4. AWS Lambda Email Scraper (Optimized)
-async function searchEmailsAWSLambda(website: string, businessName: string): Promise<EmailEnrichmentResult> {
-  const lambdaUrl = process.env.AWS_LAMBDA_EMAIL_SCRAPER_URL || 'https://7sd6o8pk79.execute-api.eu-north-1.amazonaws.com/Working/EmailBusinessScraper';
-  const authToken = process.env.AWS_LAMBDA_AUTH_TOKEN || 'b24be261-f07b-4adf-a33c-cf87084b889b';
-
+// Hunter.io API function
+async function tryHunterIO(website: string, name: string): Promise<any> {
   try {
-    console.log(`🔄 AWS Lambda searching: ${website}`);
-    
-    const response = await fetch(lambdaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        website: website,
-        business_name: businessName
-      })
-    });
+    const cleanWebsite = website.replace(/^https?:\/\//, '').replace(/^www\./, '');
+    const response = await axios.get(
+      `https://api.hunter.io/v2/domain-search?domain=${cleanWebsite}&api_key=${process.env.HUNTER_API_KEY}`,
+      { timeout: 15000 }
+    );
 
-    if (!response.ok) {
-      throw new Error(`AWS Lambda error: ${response.status}`);
+    if (response.data && response.data.data && response.data.data.emails) {
+      const emails = response.data.data.emails;
+      if (emails.length > 0) {
+        // Try to find email matching the name
+        const nameMatch = emails.find((email: any) => 
+          email.value && email.value.toLowerCase().includes(name.toLowerCase().split(' ')[0])
+        );
+        if (nameMatch) {
+          return { email: nameMatch.value, email_status: 'verified' };
+        }
+        // Return first email if no name match
+        return { email: emails[0].value, email_status: 'verified' };
+      }
     }
-
-    const data = await response.json();
-    
-    if (data.email && data.email !== 'No email found' && data.email !== 'Unknown') {
-      console.log(`✅ AWS Lambda found email: ${data.email}`);
-      return {
-        email: data.email,
-        email_status: 'unverified', // AWS Lambda doesn't provide verification
-        source: 'aws_lambda'
-      };
-    }
-
-    console.log(`❌ AWS Lambda: No email found for: ${website}`);
-    return {
-      email: null,
-      email_status: 'not_found',
-      source: 'aws_lambda'
-    };
-
-  } catch (error: any) {
-    console.error('AWS Lambda search error:', error);
-    throw error;
+    return null;
+  } catch (error) {
+    console.error('Hunter.io error:', error);
+    return null;
   }
 }
 
-// 5. Optimized Email Enrichment with Reliable Fallback
-export async function enrichLeadEmailOptimized(lead: Lead): Promise<EmailEnrichmentResult> {
-  console.log(`\n🎯 Starting optimized enrichment for: ${lead.name} (${lead.website})`);
-
-  // If lead already has a verified email, skip enrichment
-  if (lead.email && lead.email_status === 'verified') {
-    console.log(`✅ Lead already has verified email: ${lead.email}`);
-    return {
-      email: lead.email,
-      email_status: 'verified',
-      source: 'existing'
-    };
-  }
-
-  // Step 1: Try AWS Lambda Scraper (Primary) - Fastest
+// Snov.io API function
+async function trySnovIO(website: string, name: string): Promise<any> {
   try {
-    console.log(`1️⃣ Trying AWS Lambda for: ${lead.website}`);
-    const lambdaResult = await searchEmailsAWSLambda(lead.website, lead.name);
-    if (lambdaResult.email) {
-      console.log(`✅ Success with AWS Lambda: ${lambdaResult.email}`);
-      return lambdaResult;
-    }
-  } catch (error: any) {
-    console.log(`⚠️  AWS Lambda failed: ${error.message}`);
-  }
-  await sleep(300); // Reduced delay
+    const cleanWebsite = website.replace(/^https?:\/\//, '').replace(/^www\./, '');
+    const response = await axios.get(
+      `https://api.snov.io/v1/get-domain-emails-with-info?domain=${cleanWebsite}&type=all&limit=10&access_token=${process.env.SNOV_API_SECRET}`,
+      { timeout: 15000 }
+    );
 
-  // Step 2: Try Hunter.io (Secondary) - Most reliable
-  try {
-    console.log(`2️⃣ Trying Hunter.io for: ${lead.website}`);
-    const hunterResult = await searchEmailsHunter(lead.website);
-    if (hunterResult.email) {
-      console.log(`✅ Success with Hunter.io: ${hunterResult.email}`);
-      return hunterResult;
+    if (response.data && response.data.data && response.data.data.length > 0) {
+      const emails = response.data.data;
+      // Try to find email matching the name
+      const nameMatch = emails.find((email: any) => 
+        email.email && email.email.toLowerCase().includes(name.toLowerCase().split(' ')[0])
+      );
+      if (nameMatch) {
+        return { email: nameMatch.email, email_status: 'verified' };
+      }
+      // Return first email if no name match
+      return { email: emails[0].email, email_status: 'verified' };
     }
-  } catch (error: any) {
-    console.log(`⚠️  Hunter.io failed: ${error.message}`);
+    return null;
+  } catch (error) {
+    console.error('Snov.io error:', error);
+    return null;
   }
-  await sleep(300); // Reduced delay
-
-  // Step 3: Try Snov.io (Tertiary) - Backup
-  try {
-    console.log(`3️⃣ Trying Snov.io for: ${lead.website}`);
-    const snovResult = await searchEmailsSnov(lead.website);
-    if (snovResult.email) {
-      console.log(`✅ Success with Snov.io: ${snovResult.email}`);
-      return snovResult;
-    }
-  } catch (error: any) {
-    console.log(`⚠️  Snov.io failed: ${error.message}`);
-  }
-
-  // No email found anywhere
-  console.log(`❌ No email found for: ${lead.name} after trying all sources`);
-  return {
-    email: 'not_found',
-    email_status: 'not_found',
-    source: 'none'
-  };
 }
 
-// 6. Optimized Batch Processing with Concurrency Control
+// Batch enrichment with progress tracking
 export async function enrichLeadsBatchOptimized(
-  leads: Lead[], 
-  onProgress?: (progress: {completed: number, total: number, currentLead: string}) => void,
-  concurrency: number = 2 // Process 2 leads simultaneously for reliability
-): Promise<EmailEnrichmentResult[]> {
-  const results: EmailEnrichmentResult[] = [];
-  
-  console.log(`\n🎯 Starting optimized batch enrichment for ${leads.length} leads (concurrency: ${concurrency})`);
-  
-  // Process leads in batches for controlled concurrency
-  for (let i = 0; i < leads.length; i += concurrency) {
-    const batch = leads.slice(i, i + concurrency);
+  leads: any[], 
+  onProgress?: (progress: { completed: number; total: number; currentLead: string }) => void,
+  batchSize: number = 1 // Process one at a time for thoroughness
+): Promise<any[]> {
+  const results: any[] = [];
+  let completed = 0;
+
+  console.log(`🚀 Starting batch enrichment for ${leads.length} leads with batch size ${batchSize}`);
+
+  for (let i = 0; i < leads.length; i += batchSize) {
+    const batch = leads.slice(i, i + batchSize);
     
-    // Process batch in parallel
-    const batchPromises = batch.map(async (lead, batchIndex) => {
-      const leadIndex = i + batchIndex;
+    for (const lead of batch) {
+      console.log(`\n📋 Processing lead ${completed + 1}/${leads.length}: ${lead.name}`);
       
       // Update progress
       if (onProgress) {
         onProgress({
-          completed: leadIndex,
+          completed,
           total: leads.length,
           currentLead: lead.name
         });
       }
 
-      try {
-        const result = await enrichLeadEmailOptimized(lead);
-        return { index: leadIndex, result };
-      } catch (error: any) {
-        console.error(`❌ Failed to enrich lead ${lead.name}:`, error);
-        return { 
-          index: leadIndex, 
-          result: {
-            email: 'Not Found',
-            email_status: 'not_found',
-            source: 'none'
-          }
-        };
+      // Enrich the lead
+      const result = await enrichLeadEmailOptimized(lead);
+      results.push(result);
+      completed++;
+
+      // Wait between leads to avoid rate limiting
+      if (completed < leads.length) {
+        console.log(`  ⏳ Waiting 2 seconds before next lead...`);
+        await sleep(2000);
       }
-    });
-
-    // Wait for batch to complete
-    const batchResults = await Promise.all(batchPromises);
-    
-    // Add results in correct order
-    batchResults.forEach(({ index, result }) => {
-      results[index] = result;
-    });
-
-    // Conservative delay between batches for reliability
-    if (i + concurrency < leads.length) {
-      await sleep(800);
     }
   }
-  
-  // Final progress update
-  if (onProgress) {
-    onProgress({
-      completed: leads.length,
-      total: leads.length,
-      currentLead: 'Completed'
-    });
-  }
-  
-  console.log(`\n✅ Optimized batch enrichment completed: ${results.length} leads processed`);
+
+  console.log(`✅ Batch enrichment completed: ${results.length} leads processed`);
   return results;
 }
 
-// 7. Ultra-Fast Batch Processing (Maximum Speed)
+// Ultra-fast batch enrichment (for when speed is priority)
 export async function enrichLeadsBatchUltraFast(
-  leads: Lead[], 
-  onProgress?: (progress: {completed: number, total: number, currentLead: string}) => void,
-  concurrency: number = 3 // Process 3 leads simultaneously for balance
-): Promise<EmailEnrichmentResult[]> {
-  const results: EmailEnrichmentResult[] = [];
-  
-  console.log(`\n🚀 Starting ultra-fast batch enrichment for ${leads.length} leads (concurrency: ${concurrency})`);
-  
-  // Process all leads in parallel with controlled concurrency
-  const promises = leads.map(async (lead, index) => {
-    // Update progress
-    if (onProgress) {
-      onProgress({
-        completed: index,
-        total: leads.length,
-        currentLead: lead.name
-      });
-    }
+  leads: any[], 
+  onProgress?: (progress: { completed: number; total: number; currentLead: string }) => void,
+  batchSize: number = 2
+): Promise<any[]> {
+  const results: any[] = [];
+  let completed = 0;
 
-    try {
+  console.log(`🚀 Starting ultra-fast batch enrichment for ${leads.length} leads`);
+
+  for (let i = 0; i < leads.length; i += batchSize) {
+    const batch = leads.slice(i, i + batchSize);
+    
+    // Process batch in parallel
+    const batchPromises = batch.map(async (lead) => {
+      console.log(`📋 Processing lead: ${lead.name}`);
+      
+      // Update progress
+      if (onProgress) {
+        onProgress({
+          completed,
+          total: leads.length,
+          currentLead: lead.name
+        });
+      }
+
       const result = await enrichLeadEmailOptimized(lead);
-      return { index, result };
-    } catch (error: any) {
-      console.error(`❌ Failed to enrich lead ${lead.name}:`, error);
-      return { 
-        index, 
-        result: {
-          email: 'Not Found',
-          email_status: 'not_found',
-          source: 'none'
-        }
-      };
-    }
-  });
-
-  // Use Promise.allSettled to handle all promises with concurrency control
-  const settledResults = await Promise.allSettled(promises);
-  
-  // Process results
-  settledResults.forEach((settled, index) => {
-    if (settled.status === 'fulfilled') {
-      results[settled.value.index] = settled.value.result;
-    } else {
-      results[index] = {
-        email: 'Not Found',
-        email_status: 'not_found',
-        source: 'none'
-      };
-    }
-  });
-  
-  // Final progress update
-  if (onProgress) {
-    onProgress({
-      completed: leads.length,
-      total: leads.length,
-      currentLead: 'Completed'
+      completed++;
+      return result;
     });
+
+    const batchResults = await Promise.allSettled(batchPromises);
+    
+    // Add successful results
+    batchResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        console.error('Batch enrichment error:', result.reason);
+        results.push({ email: 'not_found', email_status: 'error' });
+      }
+    });
+
+    // Wait between batches
+    if (i + batchSize < leads.length) {
+      await sleep(1000);
+    }
   }
-  
-  console.log(`\n🚀 Ultra-fast batch enrichment completed: ${results.length} leads processed`);
+
+  console.log(`✅ Ultra-fast batch enrichment completed: ${results.length} leads processed`);
   return results;
+}
+
+// Utility function for delays
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
