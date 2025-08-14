@@ -2156,25 +2156,33 @@ export default function LeadsPage() {
         return;
       }
 
-      const response = await fetch('/api/enrich-leads', {
+      // Use the batch endpoint for more reliable processing
+      const response = await fetch('/api/enrich-leads/batch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           leadIds: leadsToEnrich.map(lead => lead.id),
-          backgroundMode: true // Enable background processing
+          batchSize: 2 // Process 2 leads at a time for reliability
         })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Use background enrichment notification instead of blocking
-        setBackgroundEnrichmentJobId(data.jobId);
-        setToastMessage(`✅ Background enrichment started for ${leadsToEnrich.length} leads! You can continue working.`);
+        // Show completion message and refresh data
+        const successCount = data.results?.successfulEmails || 0;
+        setToastMessage(`✅ Enrichment completed! Found ${successCount} emails out of ${leadsToEnrich.length} leads.`);
         setIsToastVisible(true);
         setTimeout(() => setIsToastVisible(false), 5000);
+        
+        // Refresh leads to show updated data
+        fetchLeads();
+        
+        // Clear selection
+        setSelectedLeads([]);
+        setSelectAll(false);
       } else {
         throw new Error(data.error || 'Failed to start enrichment');
     }

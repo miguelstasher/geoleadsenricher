@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Global state for tracking enrichment jobs
+// Global state for tracking enrichment jobs (in-memory - will reset on server restart)
 const enrichmentJobs = new Map<string, {
   status: 'running' | 'completed' | 'cancelled' | 'error';
   progress: {
@@ -66,23 +66,32 @@ export async function POST(request: NextRequest) {
       estimatedCompletionTime: Date.now() + (leadsToEnrich.length * 2000) // Estimate 2 seconds per lead (optimized)
     });
 
-    // Start background processing with speed mode (don't await this)
-    processEnrichmentJob(jobId, leadsToEnrich, speedMode, backgroundMode).catch(error => {
-      console.error(`❌ Enrichment job ${jobId} failed:`, error);
-      const job = enrichmentJobs.get(jobId);
-      if (job) {
-        job.status = 'error';
-        job.error = error.message;
-      }
-    });
+    if (backgroundMode) {
+      // For background mode, start processing immediately but don't wait
+      // This will run in the same request context but won't block the response
+      processEnrichmentJobImmediate(jobId, leadsToEnrich, speedMode).catch(error => {
+        console.error(`❌ Enrichment job ${jobId} failed:`, error);
+        const job = enrichmentJobs.get(jobId);
+        if (job) {
+          job.status = 'error';
+          job.error = error.message;
+        }
+      });
+    } else {
+      // For immediate mode, process synchronously
+      await processEnrichmentJobImmediate(jobId, leadsToEnrich, speedMode);
+    }
 
     return NextResponse.json({
       success: true,
       jobId,
-      message: `Enrichment started for ${leadsToEnrich.length} leads`,
+      message: backgroundMode ? 
+        `Background enrichment started for ${leadsToEnrich.length} leads` : 
+        `Enrichment completed for ${leadsToEnrich.length} leads`,
       leadsToEnrich: leadsToEnrich.length,
       leadsSkipped: leads.length - leadsToEnrich.length,
-      estimatedTimeMinutes: Math.ceil(leadsToEnrich.length * 2 / 60) // Optimized time estimate
+      estimatedTimeMinutes: Math.ceil(leadsToEnrich.length * 2 / 60), // Optimized time estimate
+      backgroundMode
     });
 
   } catch (error: any) {
@@ -91,8 +100,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Background processing function
-async function processEnrichmentJob(jobId: string, leads: any[], speedMode: string = 'optimized', backgroundMode: boolean = false) {
+// Immediate processing function (runs in same request context)
+async function processEnrichmentJobImmediate(jobId: string, leads: any[], speedMode: string = 'optimized') {
   const job = enrichmentJobs.get(jobId);
   if (!job) {
     console.error(`❌ Job ${jobId} not found in enrichmentJobs`);
@@ -100,12 +109,11 @@ async function processEnrichmentJob(jobId: string, leads: any[], speedMode: stri
   }
 
   try {
-    console.log(`🚀 Starting background enrichment job ${jobId} for ${leads.length} leads`);
+    console.log(`🚀 Starting immediate enrichment job ${jobId} for ${leads.length} leads`);
     console.log(`📊 Job details:`, {
       jobId,
       leadsCount: leads.length,
       speedMode,
-      backgroundMode,
       startTime: new Date().toISOString()
     });
 
