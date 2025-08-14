@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// Email enrichment function using multiple APIs with proper delays
+// Original working email enrichment function
 export async function enrichLeadEmailOptimized(lead: any): Promise<any> {
   const { name, website } = lead;
   
@@ -21,7 +21,7 @@ export async function enrichLeadEmailOptimized(lead: any): Promise<any> {
 
     // Step 2: Try Hunter.io
     console.log(`  📡 Step 2: Trying Hunter.io...`);
-    await sleep(1000); // Wait 1 second between APIs
+    await sleep(2000); // Wait 2 seconds between APIs
     const hunterResult = await tryHunterIO(website, name);
     if (hunterResult && hunterResult.email && hunterResult.email !== 'not_found') {
       console.log(`  ✅ Hunter.io found: ${hunterResult.email}`);
@@ -30,7 +30,7 @@ export async function enrichLeadEmailOptimized(lead: any): Promise<any> {
 
     // Step 3: Try Snov.io
     console.log(`  📡 Step 3: Trying Snov.io...`);
-    await sleep(1000); // Wait 1 second between APIs
+    await sleep(2000); // Wait 2 seconds between APIs
     const snovResult = await trySnovIO(website, name);
     if (snovResult && snovResult.email && snovResult.email !== 'not_found') {
       console.log(`  ✅ Snov.io found: ${snovResult.email}`);
@@ -46,7 +46,7 @@ export async function enrichLeadEmailOptimized(lead: any): Promise<any> {
   }
 }
 
-// AWS Lambda scraper function - SIMPLE VERSION THAT WORKS
+// AWS Lambda scraper function - ORIGINAL WORKING VERSION
 async function tryAWSLambdaScraper(website: string, name: string): Promise<any> {
   try {
     console.log(`  🔗 Calling AWS Lambda for: ${website}`);
@@ -68,7 +68,7 @@ async function tryAWSLambdaScraper(website: string, name: string): Promise<any> 
 
     console.log(`  📥 AWS Lambda response:`, response.data);
 
-    // Simple check - if response has email, use it
+    // Original simple check that was working
     if (response.data && response.data.email && response.data.email !== 'not_found') {
       console.log(`  ✅ AWS Lambda found email: ${response.data.email}`);
       return { email: response.data.email, email_status: 'verified' };
@@ -140,11 +140,11 @@ async function trySnovIO(website: string, name: string): Promise<any> {
   }
 }
 
-// Batch enrichment with progress tracking
+// Original working batch enrichment - SLOW BUT RELIABLE
 export async function enrichLeadsBatchOptimized(
   leads: any[], 
   onProgress?: (progress: { completed: number; total: number; currentLead: string }) => void,
-  batchSize: number = 1 // Process one at a time for thoroughness
+  batchSize: number = 1 // Process one at a time for reliability
 ): Promise<any[]> {
   const results: any[] = [];
   let completed = 0;
@@ -171,10 +171,10 @@ export async function enrichLeadsBatchOptimized(
       results.push(result);
       completed++;
 
-      // Wait between leads to avoid rate limiting
+      // Wait between leads to avoid rate limiting - ORIGINAL SLOWER VERSION
       if (completed < leads.length) {
-        console.log(`  ⏳ Waiting 2 seconds before next lead...`);
-        await sleep(2000);
+        console.log(`  ⏳ Waiting 5 seconds before next lead...`);
+        await sleep(5000); // 5 second delay like the original
       }
     }
   }

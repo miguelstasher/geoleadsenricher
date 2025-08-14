@@ -7,8 +7,7 @@ import React from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useNotifications } from '../components/SimpleNotificationProvider';
 import EnrichmentNotification from '../components/EnrichmentNotification';
-import EnrichmentProgressNotification from '../components/EnrichmentProgressNotification';
-import { toast } from 'react-toastify';
+
 
 import { useSearchParams } from 'next/navigation';
 import RecordOwnerDisplay from '../components/RecordOwnerDisplay';
@@ -2179,17 +2178,18 @@ export default function LeadsPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Start progress tracking with the new notification system
-        setEnrichmentJobId(data.jobId);
+        // Show completion message and refresh data
+        const successCount = data.results?.successfulEmails || 0;
+        setToastMessage(`✅ Enrichment completed! Found ${successCount} emails out of ${leadsToEnrich.length} leads.`);
+        setIsToastVisible(true);
+        setTimeout(() => setIsToastVisible(false), 5000);
         
-        // Show immediate notification that enrichment is starting
-        toast.info(
-          `🔍 Enrichment started for ${leadsToEnrich.length} leads! Check the progress notification.`,
-          {
-            autoClose: 3000,
-            position: "top-right"
-          }
-        );
+        // Refresh leads to show updated data
+        fetchLeads();
+        
+        // Clear selection
+        setSelectedLeads([]);
+        setSelectAll(false);
       } else {
         throw new Error(data.error || 'Failed to start enrichment');
       }
@@ -4663,16 +4663,7 @@ export default function LeadsPage() {
         onCancel={handleEnrichmentCancel}
       />
 
-      {/* Progress Notification */}
-      <EnrichmentProgressNotification 
-        jobId={enrichmentJobId}
-        onClose={() => {
-          setEnrichmentJobId(null);
-          fetchLeads(); // Refresh leads data
-          setSelectedLeads([]); // Clear selection
-          setSelectAll(false);
-        }}
-      />
+
 
       <Toast />
     </div>
