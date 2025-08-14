@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       progress: {
         completed: 0,
         total: leadsToEnrich.length,
-        currentLead: leadsToEnrich.length > 0 ? leadsToEnrich[0].name : 'None'
+        currentLead: leadsToEnrich.length > 0 ? leadsToEnrich[0].name : 'Starting enrichment...'
       },
       startTime: Date.now()
     });

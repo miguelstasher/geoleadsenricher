@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { useNotifications } from '../components/SimpleNotificationProvider';
 import EnrichmentNotification from '../components/EnrichmentNotification';
 import EnrichmentProgressNotification from '../components/EnrichmentProgressNotification';
+import { toast } from 'react-toastify';
 
 import { useSearchParams } from 'next/navigation';
 import RecordOwnerDisplay from '../components/RecordOwnerDisplay';
@@ -2181,10 +2182,14 @@ export default function LeadsPage() {
         // Start progress tracking with the new notification system
         setEnrichmentJobId(data.jobId);
         
-        // Show initial message
-        setToastMessage(`🔍 Enrichment started for ${leadsToEnrich.length} leads! Check the notification for progress.`);
-        setIsToastVisible(true);
-        setTimeout(() => setIsToastVisible(false), 3000);
+        // Show immediate notification that enrichment is starting
+        toast.info(
+          `🔍 Enrichment started for ${leadsToEnrich.length} leads! Check the progress notification.`,
+          {
+            autoClose: 3000,
+            position: "top-right"
+          }
+        );
       } else {
         throw new Error(data.error || 'Failed to start enrichment');
       }

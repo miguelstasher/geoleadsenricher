@@ -16,6 +16,7 @@ interface EnrichmentProgress {
     successfulEmails: number;
   };
   error?: string;
+  startTime: number;
 }
 
 interface EnrichmentProgressNotificationProps {
@@ -33,6 +34,14 @@ export default function EnrichmentProgressNotification({
   useEffect(() => {
     if (jobId) {
       setIsVisible(true);
+      // Initialize with starting progress
+      setProgress({
+        completed: 0,
+        total: 0,
+        currentLead: 'Starting enrichment...',
+        status: 'running',
+        startTime: Date.now()
+      });
       startProgressTracking();
     } else {
       setIsVisible(false);
@@ -88,15 +97,28 @@ export default function EnrichmentProgressNotification({
               );
             }
             
-            // Close the progress notification
+            // Close the progress notification after a delay
             setTimeout(() => {
               setIsVisible(false);
               onClose();
-            }, 2000);
+            }, 3000);
           }
+        } else {
+          // If we can't fetch status, assume it's still running
+          setProgress(prev => prev ? {
+            ...prev,
+            currentLead: 'Processing leads...',
+            completed: Math.min(prev.completed + 1, prev.total || 10)
+          } : null);
         }
       } catch (error) {
         console.error('Error fetching progress:', error);
+        // If we can't fetch status, assume it's still running
+        setProgress(prev => prev ? {
+          ...prev,
+          currentLead: 'Processing leads...',
+          completed: Math.min(prev.completed + 1, prev.total || 10)
+        } : null);
       }
     }, 2000); // Check every 2 seconds
 
@@ -104,10 +126,10 @@ export default function EnrichmentProgressNotification({
     return () => clearInterval(interval);
   };
 
-  if (!isVisible || !progress) return null;
+  if (!isVisible) return null;
 
-  const percentage = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
-  const elapsedTime = Math.floor((Date.now() - (progress.startTime || Date.now())) / 1000 / 60);
+  const percentage = progress?.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+  const elapsedTime = progress?.startTime ? Math.floor((Date.now() - progress.startTime) / 1000 / 60) : 0;
 
   return (
     <div className="fixed top-4 right-4 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
@@ -134,7 +156,7 @@ export default function EnrichmentProgressNotification({
         {/* Progress Bar */}
         <div className="mb-3">
           <div className="flex justify-between text-sm text-gray-600 mb-1">
-            <span>{progress.completed}/{progress.total} leads</span>
+            <span>{progress?.completed || 0}/{progress?.total || '?'} leads</span>
             <span>{percentage}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
@@ -146,7 +168,7 @@ export default function EnrichmentProgressNotification({
         </div>
 
         {/* Current Lead */}
-        {progress.status === 'running' && progress.currentLead && (
+        {progress?.status === 'running' && progress.currentLead && (
           <div className="mb-3">
             <div className="text-xs text-gray-500 mb-1">Currently processing:</div>
             <div className="text-sm font-medium text-gray-900 truncate">
@@ -158,7 +180,7 @@ export default function EnrichmentProgressNotification({
         {/* Status and Time */}
         <div className="flex justify-between items-center text-sm">
           <div className="flex items-center space-x-2">
-            {progress.status === 'running' && (
+            {progress?.status === 'running' && (
               <div className="flex items-center space-x-1 text-blue-600">
                 <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -167,7 +189,7 @@ export default function EnrichmentProgressNotification({
                 <span>Running</span>
               </div>
             )}
-            {progress.status === 'completed' && (
+            {progress?.status === 'completed' && (
               <div className="flex items-center space-x-1 text-green-600">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -175,7 +197,7 @@ export default function EnrichmentProgressNotification({
                 <span>Completed</span>
               </div>
             )}
-            {progress.status === 'error' && (
+            {progress?.status === 'error' && (
               <div className="flex items-center space-x-1 text-red-600">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -190,7 +212,7 @@ export default function EnrichmentProgressNotification({
         </div>
 
         {/* Results Summary (when completed) */}
-        {progress.status === 'completed' && progress.results && (
+        {progress?.status === 'completed' && progress.results && (
           <div className="mt-3 p-3 bg-green-50 rounded border border-green-200">
             <div className="text-sm text-green-800">
               <div className="font-medium mb-1">Results Summary:</div>
@@ -206,7 +228,7 @@ export default function EnrichmentProgressNotification({
         )}
 
         {/* Error Message (when failed) */}
-        {progress.status === 'error' && progress.error && (
+        {progress?.status === 'error' && progress.error && (
           <div className="mt-3 p-3 bg-red-50 rounded border border-red-200">
             <div className="text-sm text-red-800">
               <div className="font-medium mb-1">Error:</div>
