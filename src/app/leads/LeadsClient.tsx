@@ -7,6 +7,7 @@ import React from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useNotifications } from '../components/SimpleNotificationProvider';
 import EnrichmentNotification from '../components/EnrichmentNotification';
+import BackgroundEnrichmentNotification from '../components/BackgroundEnrichmentNotification';
 import { useSearchParams } from 'next/navigation';
 import RecordOwnerDisplay from '../components/RecordOwnerDisplay';
 
@@ -262,6 +263,7 @@ export default function LeadsPage() {
 
   // Email Enrichment State
   const [enrichmentJobId, setEnrichmentJobId] = useState<string | null>(null);
+  const [backgroundEnrichmentJobId, setBackgroundEnrichmentJobId] = useState<string | null>(null);
   const [showEnrichConfirmModal, setShowEnrichConfirmModal] = useState(false);
   const [showEnrichmentDropdown, setShowEnrichmentDropdown] = useState(false);
   const [selectedEnrichmentType, setSelectedEnrichmentType] = useState<'email' | 'linkedin' | 'facebook'>('email');
@@ -2160,15 +2162,17 @@ export default function LeadsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          leadIds: leadsToEnrich.map(lead => lead.id)
+          leadIds: leadsToEnrich.map(lead => lead.id),
+          backgroundMode: true // Enable background processing
         })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setEnrichmentJobId(data.jobId);
-        setToastMessage(`✅ Enrichment started for ${leadsToEnrich.length} leads!`);
+        // Use background enrichment notification instead of blocking
+        setBackgroundEnrichmentJobId(data.jobId);
+        setToastMessage(`✅ Background enrichment started for ${leadsToEnrich.length} leads! You can continue working.`);
         setIsToastVisible(true);
         setTimeout(() => setIsToastVisible(false), 5000);
       } else {
@@ -2328,6 +2332,23 @@ export default function LeadsPage() {
   const handleEnrichmentCancel = () => {
     setEnrichmentJobId(null);
     setToastMessage('⏹️ Email enrichment cancelled');
+    setIsToastVisible(true);
+    setTimeout(() => setIsToastVisible(false), 3000);
+  };
+
+  // Background Enrichment Handlers
+  const handleBackgroundEnrichmentComplete = () => {
+    setBackgroundEnrichmentJobId(null);
+    // Refresh leads to show updated data
+    fetchLeads();
+    // Clear selection
+    setSelectedLeads([]);
+    setSelectAll(false);
+  };
+
+  const handleBackgroundEnrichmentCancel = () => {
+    setBackgroundEnrichmentJobId(null);
+    setToastMessage('⏹️ Background enrichment cancelled');
     setIsToastVisible(true);
     setTimeout(() => setIsToastVisible(false), 3000);
   };
@@ -4617,6 +4638,13 @@ export default function LeadsPage() {
         jobId={enrichmentJobId}
         onComplete={handleEnrichmentComplete}
         onCancel={handleEnrichmentCancel}
+      />
+
+      {/* Background Enrichment Notification */}
+      <BackgroundEnrichmentNotification 
+        jobId={backgroundEnrichmentJobId}
+        onComplete={handleBackgroundEnrichmentComplete}
+        onCancel={handleBackgroundEnrichmentCancel}
       />
 
       <Toast />

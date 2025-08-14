@@ -24,7 +24,7 @@ const enrichmentJobs = new Map<string, {
 
 export async function POST(request: NextRequest) {
   try {
-    const { leadIds, speedMode = 'optimized' } = await request.json();
+    const { leadIds, speedMode = 'optimized', backgroundMode = false } = await request.json();
 
     if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
       return NextResponse.json({ error: 'Lead IDs are required' }, { status: 400 });
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Start background processing with speed mode (don't await this)
-    processEnrichmentJob(jobId, leadsToEnrich, speedMode).catch(error => {
+    processEnrichmentJob(jobId, leadsToEnrich, speedMode, backgroundMode).catch(error => {
       console.error(`❌ Enrichment job ${jobId} failed:`, error);
       const job = enrichmentJobs.get(jobId);
       if (job) {
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Background processing function
-async function processEnrichmentJob(jobId: string, leads: any[], speedMode: string = 'optimized') {
+async function processEnrichmentJob(jobId: string, leads: any[], speedMode: string = 'optimized', backgroundMode: boolean = false) {
   const job = enrichmentJobs.get(jobId);
   if (!job) return;
 
