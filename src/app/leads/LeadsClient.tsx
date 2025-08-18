@@ -7,8 +7,6 @@ import React from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useNotifications } from '../components/SimpleNotificationProvider';
 import EnrichmentNotification from '../components/EnrichmentNotification';
-
-
 import { useSearchParams } from 'next/navigation';
 import RecordOwnerDisplay from '../components/RecordOwnerDisplay';
 
@@ -264,10 +262,10 @@ export default function LeadsPage() {
 
   // Email Enrichment State
   const [enrichmentJobId, setEnrichmentJobId] = useState<string | null>(null);
-  const [isEnriching, setIsEnriching] = useState(false);
   const [showEnrichConfirmModal, setShowEnrichConfirmModal] = useState(false);
   const [showEnrichmentDropdown, setShowEnrichmentDropdown] = useState(false);
   const [selectedEnrichmentType, setSelectedEnrichmentType] = useState<'email' | 'linkedin' | 'facebook'>('email');
+  const [enrichmentSpeed, setEnrichmentSpeed] = useState<'normal' | 'fast' | 'ultra'>('normal');
   const [enrichmentPreCheckData, setEnrichmentPreCheckData] = useState<{
     totalSelected: number;
     alreadyVerified: number;
@@ -2149,7 +2147,6 @@ export default function LeadsPage() {
   };
 
   const startEnrichmentProcess = async (leadsToEnrich: Lead[]) => {
-    try {
       // If no leads to enrich, stop here
       if (leadsToEnrich.length === 0) {
         setToastMessage('❌ No leads selected for enrichment.');
@@ -2158,48 +2155,26 @@ export default function LeadsPage() {
         return;
       }
 
-      // Set loading state
-      setIsEnriching(true);
-      setToastMessage(`🔍 Starting enrichment for ${leadsToEnrich.length} leads...`);
-      setIsToastVisible(true);
-
-      // Use the batch endpoint for more reliable processing
-      const response = await fetch('/api/enrich-leads/batch', {
+      const response = await fetch('/api/enrich-leads', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           leadIds: leadsToEnrich.map(lead => lead.id),
-          batchSize: 1 // Process 1 lead at a time for thoroughness
+          speedMode: enrichmentSpeed
         })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Show completion message and refresh data
-        const successCount = data.results?.successfulEmails || 0;
-        setToastMessage(`✅ Enrichment completed! Found ${successCount} emails out of ${leadsToEnrich.length} leads.`);
+        setEnrichmentJobId(data.jobId);
+        setToastMessage(`✅ Enrichment started for ${leadsToEnrich.length} leads!`);
         setIsToastVisible(true);
         setTimeout(() => setIsToastVisible(false), 5000);
-        
-        // Refresh leads to show updated data
-        fetchLeads();
-        
-        // Clear selection
-        setSelectedLeads([]);
-        setSelectAll(false);
       } else {
         throw new Error(data.error || 'Failed to start enrichment');
-      }
-    } catch (error: any) {
-      console.error('Error during enrichment:', error);
-      setToastMessage(`❌ Enrichment failed: ${error.message}`);
-      setIsToastVisible(true);
-      setTimeout(() => setIsToastVisible(false), 5000);
-    } finally {
-      setIsEnriching(false);
     }
   };
 
@@ -2357,14 +2332,6 @@ export default function LeadsPage() {
     setToastMessage('⏹️ Email enrichment cancelled');
     setIsToastVisible(true);
     setTimeout(() => setIsToastVisible(false), 3000);
-  };
-
-  // Enrichment completion handler
-  const handleEnrichmentComplete = () => {
-    setIsEnriching(false);
-    fetchLeads(); // Refresh leads data
-    setSelectedLeads([]); // Clear selection
-    setSelectAll(false);
   };
 
   // Close dropdown when clicking outside
@@ -2621,30 +2588,58 @@ export default function LeadsPage() {
               <div className="relative enrichment-dropdown">
                 <button 
                   onClick={() => setShowEnrichmentDropdown(!showEnrichmentDropdown)}
-                  className={`bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center space-x-1 ${selectedLeads.length === 0 || isEnriching ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  disabled={selectedLeads.length === 0 || isEnriching}
-                  title={isEnriching ? "Enrichment in progress..." : "Enrichment Options"}
+                  className={`bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center space-x-1 ${selectedLeads.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={selectedLeads.length === 0}
+                  title="Enrichment Options"
                 >
-                  {isEnriching ? (
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  )}
-                  <span>{isEnriching ? 'Enriching...' : 'Enrich'}</span>
-                  {!isEnriching && (
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  )}
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>Enrich</span>
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
                 
                 {showEnrichmentDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                  <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                    {/* Speed Selector */}
+                    <div className="px-4 py-2 border-b border-gray-100">
+                      <div className="text-xs font-medium text-gray-500 mb-2">Speed Mode:</div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => setEnrichmentSpeed('normal')}
+                          className={`px-2 py-1 text-xs rounded ${
+                            enrichmentSpeed === 'normal' 
+                              ? 'bg-blue-100 text-blue-700 border border-blue-300' 
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          Normal
+                        </button>
+                        <button
+                          onClick={() => setEnrichmentSpeed('fast')}
+                          className={`px-2 py-1 text-xs rounded ${
+                            enrichmentSpeed === 'fast' 
+                              ? 'bg-green-100 text-green-700 border border-green-300' 
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          Fast
+                        </button>
+                        <button
+                          onClick={() => setEnrichmentSpeed('ultra')}
+                          className={`px-2 py-1 text-xs rounded ${
+                            enrichmentSpeed === 'ultra' 
+                              ? 'bg-purple-100 text-purple-700 border border-purple-300' 
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          Ultra
+                        </button>
+                      </div>
+                    </div>
+                    
                     <button
                       onClick={() => {
                         setSelectedEnrichmentType('email');
@@ -2655,7 +2650,7 @@ export default function LeadsPage() {
                     >
                       <div className="flex items-center space-x-2">
                         <span>✉️</span>
-                        <span>Enrich Emails</span>
+                        <span>Enrich Emails ({enrichmentSpeed} speed)</span>
                       </div>
                     </button>
                     <button
@@ -4656,14 +4651,12 @@ export default function LeadsPage() {
       </div>
       )}
 
-            {/* Enrichment Notification */}
+      {/* Enrichment Notification */}
       <EnrichmentNotification 
         jobId={enrichmentJobId}
         onComplete={handleEnrichmentComplete}
         onCancel={handleEnrichmentCancel}
       />
-
-
 
       <Toast />
     </div>

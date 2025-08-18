@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { enrichLeadsBatch } from '../../../utils/emailEnrichment';
-import { enrichLeadsBatchOptimized, enrichLeadsBatchUltraFast } from '../../../utils/emailEnrichmentOptimized';
+import { enrichLeadsBatch, enrichLeadsFast } from '../../../utils/emailEnrichment';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Global state for tracking enrichment jobs (in-memory - will reset on server restart)
+// Global state for tracking enrichment jobs
 const enrichmentJobs = new Map<string, {
   status: 'running' | 'completed' | 'cancelled' | 'error';
   progress: {
@@ -20,11 +19,12 @@ const enrichmentJobs = new Map<string, {
   error?: string;
   startTime: number;
   estimatedCompletionTime?: number;
+  speedMode?: 'normal' | 'fast' | 'ultra';
 }>();
 
 export async function POST(request: NextRequest) {
   try {
-    const { leadIds, speedMode = 'optimized', backgroundMode = false } = await request.json();
+    const { leadIds, speedMode = 'normal' } = await request.json();
 
     if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
       return NextResponse.json({ error: 'Lead IDs are required' }, { status: 400 });
@@ -52,7 +52,25 @@ export async function POST(request: NextRequest) {
       !lead.email || lead.email.trim() === '' || lead.email === 'Not Found' || lead.email === 'not_found'
     );
 
-    console.log(`🎯 Enrichment job ${jobId}: ${leads.length} selected leads, ${leadsToEnrich.length} need enrichment`);
+    console.log(`🎯 Enrichment job ${jobId}: ${leads.length} selected leads, ${leadsToEnrich.length} need enrichment (Speed: ${speedMode})`);
+
+    // Calculate estimated time based on speed mode
+    let estimatedTimePerLead = 5000; // Default 5 seconds
+    let concurrency = 1; // Default sequential processing
+    
+    switch (speedMode) {
+      case 'fast':
+        estimatedTimePerLead = 2000; // 2 seconds per lead
+        concurrency = 3; // Process 3 leads in parallel
+        break;
+      case 'ultra':
+        estimatedTimePerLead = 1000; // 1 second per lead
+        concurrency = 5; // Process 5 leads in parallel
+        break;
+      default:
+        estimatedTimePerLead = 5000; // 5 seconds per lead
+        concurrency = 1; // Sequential processing
+    }
 
     // Initialize job status
     enrichmentJobs.set(jobId, {
@@ -63,35 +81,28 @@ export async function POST(request: NextRequest) {
         currentLead: leadsToEnrich.length > 0 ? leadsToEnrich[0].name : 'None'
       },
       startTime: Date.now(),
-      estimatedCompletionTime: Date.now() + (leadsToEnrich.length * 2000) // Estimate 2 seconds per lead (optimized)
+      estimatedCompletionTime: Date.now() + (leadsToEnrich.length * estimatedTimePerLead),
+      speedMode
     });
 
-    if (backgroundMode) {
-      // For background mode, start processing immediately but don't wait
-      // This will run in the same request context but won't block the response
-      processEnrichmentJobImmediate(jobId, leadsToEnrich, speedMode).catch(error => {
-        console.error(`❌ Enrichment job ${jobId} failed:`, error);
-        const job = enrichmentJobs.get(jobId);
-        if (job) {
-          job.status = 'error';
-          job.error = error.message;
-        }
-      });
-    } else {
-      // For immediate mode, process synchronously
-      await processEnrichmentJobImmediate(jobId, leadsToEnrich, speedMode);
-    }
+    // Start background processing (don't await this)
+    processEnrichmentJob(jobId, leadsToEnrich, speedMode, concurrency).catch(error => {
+      console.error(`❌ Enrichment job ${jobId} failed:`, error);
+      const job = enrichmentJobs.get(jobId);
+      if (job) {
+        job.status = 'error';
+        job.error = error.message;
+      }
+    });
 
     return NextResponse.json({
       success: true,
       jobId,
-      message: backgroundMode ? 
-        `Background enrichment started for ${leadsToEnrich.length} leads` : 
-        `Enrichment completed for ${leadsToEnrich.length} leads`,
+      message: `Enrichment started for ${leadsToEnrich.length} leads (Speed: ${speedMode})`,
       leadsToEnrich: leadsToEnrich.length,
       leadsSkipped: leads.length - leadsToEnrich.length,
-      estimatedTimeMinutes: Math.ceil(leadsToEnrich.length * 2 / 60), // Optimized time estimate
-      backgroundMode
+      speedMode,
+      estimatedTimeMinutes: Math.ceil(leadsToEnrich.length * estimatedTimePerLead / 60000)
     });
 
   } catch (error: any) {
@@ -100,47 +111,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Immediate processing function (runs in same request context)
-async function processEnrichmentJobImmediate(jobId: string, leads: any[], speedMode: string = 'optimized') {
+// Background processing function with speed options
+async function processEnrichmentJob(jobId: string, leads: any[], speedMode: string, concurrency: number) {
   const job = enrichmentJobs.get(jobId);
-  if (!job) {
-    console.error(`❌ Job ${jobId} not found in enrichmentJobs`);
-    return;
-  }
+  if (!job) return;
 
   try {
-    console.log(`🚀 Starting immediate enrichment job ${jobId} for ${leads.length} leads`);
-    console.log(`📊 Job details:`, {
-      jobId,
-      leadsCount: leads.length,
-      speedMode,
-      startTime: new Date().toISOString()
-    });
+    console.log(`🚀 Starting background enrichment job ${jobId} for ${leads.length} leads (Speed: ${speedMode}, Concurrency: ${concurrency})`);
 
-    // Process leads in batch with speed-optimized enrichment
-    const enrichmentFunction = speedMode === 'ultra-fast' ? enrichLeadsBatchUltraFast : enrichLeadsBatchOptimized;
-    console.log(`🔧 Using enrichment function: ${speedMode === 'ultra-fast' ? 'ultra-fast' : 'optimized'}`);
+    let results;
     
-    const results = await enrichmentFunction(leads, (progress) => {
-      const currentJob = enrichmentJobs.get(jobId);
-      if (currentJob && currentJob.status === 'running') {
-        currentJob.progress = progress;
-        console.log(`📈 Progress update for job ${jobId}:`, progress);
-        
-        // Update estimated completion time based on actual progress
-        if (progress.completed > 0) {
-          const avgTimePerLead = (Date.now() - currentJob.startTime) / progress.completed;
-          const remainingLeads = progress.total - progress.completed;
-          currentJob.estimatedCompletionTime = Date.now() + (remainingLeads * avgTimePerLead);
-        }
-      }
-    });
-
-    console.log(`📋 Enrichment results for job ${jobId}:`, {
-      totalResults: results.length,
-      successfulResults: results.filter(r => r.email && r.email !== 'not_found').length,
-      failedResults: results.filter(r => !r.email || r.email === 'not_found').length
-    });
+    // Choose enrichment function based on speed mode
+    if (speedMode === 'ultra') {
+      // Use ultra-fast parallel processing
+      results = await enrichLeadsFast(leads, (progress) => {
+        updateJobProgress(jobId, progress);
+      });
+    } else {
+      // Use batch processing with configurable concurrency
+      results = await enrichLeadsBatch(leads, (progress) => {
+        updateJobProgress(jobId, progress);
+      }, concurrency);
+    }
 
     // Check if job was cancelled during processing
     const finalJob = enrichmentJobs.get(jobId);
@@ -149,21 +141,10 @@ async function processEnrichmentJobImmediate(jobId: string, leads: any[], speedM
       return;
     }
 
-    console.log(`💾 Starting database updates for job ${jobId}...`);
-
     // Update database with results
-    let updatedCount = 0;
-    let errorCount = 0;
-    
     for (let i = 0; i < leads.length; i++) {
       const lead = leads[i];
       const result = results[i];
-      
-      console.log(`🔍 Processing lead ${i + 1}/${leads.length}: ${lead.name}`, {
-        leadId: lead.id,
-        resultEmail: result?.email,
-        resultStatus: result?.email_status
-      });
       
       if (result && result.email && 
           result.email !== 'not_found' && 
@@ -185,10 +166,8 @@ async function processEnrichmentJobImmediate(jobId: string, leads: any[], speedM
 
         if (updateError) {
           console.error(`❌ Failed to update lead ${lead.id}:`, updateError);
-          errorCount++;
         } else {
           console.log(`✅ Updated lead ${lead.name} with email: ${result.email}`);
-          updatedCount++;
         }
       } else if (result && result.email_status === 'not_found') {
         // Update lead with not_found status
@@ -202,46 +181,42 @@ async function processEnrichmentJobImmediate(jobId: string, leads: any[], speedM
 
         if (updateError) {
           console.error(`❌ Failed to update lead ${lead.id} status:`, updateError);
-          errorCount++;
         } else {
           console.log(`📝 Updated lead ${lead.name} status: not_found`);
-          updatedCount++;
         }
-      } else {
-        console.log(`⚠️ Skipping lead ${lead.name} - no valid result`);
       }
     }
-
-    console.log(`📊 Database update summary for job ${jobId}:`, {
-      totalLeads: leads.length,
-      updatedCount,
-      errorCount,
-      skippedCount: leads.length - updatedCount - errorCount
-    });
 
     // Mark job as completed
     if (finalJob) {
       finalJob.status = 'completed';
       finalJob.results = results;
       finalJob.progress.currentLead = 'Completed';
-      finalJob.progress.completed = leads.length;
     }
 
-    console.log(`✅ Enrichment job ${jobId} completed successfully`);
+    console.log(`✅ Enrichment job ${jobId} completed successfully (Speed: ${speedMode})`);
 
   } catch (error: any) {
     console.error(`❌ Enrichment job ${jobId} failed:`, error);
-    console.error(`🔍 Error details:`, {
-      message: error.message,
-      stack: error.stack,
-      jobId,
-      leadsCount: leads.length
-    });
-    
     const job = enrichmentJobs.get(jobId);
     if (job) {
       job.status = 'error';
       job.error = error.message;
+    }
+  }
+}
+
+// Helper function to update job progress
+function updateJobProgress(jobId: string, progress: any) {
+  const currentJob = enrichmentJobs.get(jobId);
+  if (currentJob && currentJob.status === 'running') {
+    currentJob.progress = progress;
+    
+    // Update estimated completion time based on actual progress
+    if (progress.completed > 0) {
+      const avgTimePerLead = (Date.now() - currentJob.startTime) / progress.completed;
+      const remainingLeads = progress.total - progress.completed;
+      currentJob.estimatedCompletionTime = Date.now() + (remainingLeads * avgTimePerLead);
     }
   }
 }
