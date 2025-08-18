@@ -276,10 +276,26 @@ async function searchEmailsAWSLambda(website: string, businessName: string): Pro
     });
 
     if (!response.ok) {
-      throw new Error(`AWS Lambda error: ${response.status}`);
+      console.error(`❌ AWS Lambda HTTP error: ${response.status} - ${response.statusText}`);
+      throw new Error(`AWS Lambda HTTP error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const responseData = await response.json();
+    console.log(`🔍 AWS Lambda raw response:`, JSON.stringify(responseData, null, 2));
+    
+    // Parse the body if it's a string (Lambda API Gateway format)
+    let data;
+    if (responseData.body && typeof responseData.body === 'string') {
+      try {
+        data = JSON.parse(responseData.body);
+        console.log(`🔍 Parsed Lambda body:`, JSON.stringify(data, null, 2));
+      } catch (parseError) {
+        console.error(`❌ Failed to parse Lambda body:`, parseError);
+        data = responseData; // Fallback to original response
+      }
+    } else {
+      data = responseData; // Direct response format
+    }
     
     // Handle both formats: new format has single 'email' field, old format has 'emails' array
     let foundEmail = null;
@@ -379,12 +395,15 @@ export async function enrichLeadEmail(lead: Lead): Promise<EmailEnrichmentResult
   try {
     console.log(`1️⃣ Trying AWS Lambda for: ${lead.website}`);
     const lambdaResult = await searchEmailsAWSLambda(lead.website, lead.name);
-    if (lambdaResult.email) {
+    if (lambdaResult.email && lambdaResult.email !== 'not_found' && lambdaResult.email !== 'No email found') {
       console.log(`✅ Success with AWS Lambda: ${lambdaResult.email}`);
       return lambdaResult;
+    } else {
+      console.log(`⚠️  AWS Lambda found no email for: ${lead.website}`);
     }
   } catch (error: any) {
-    console.log(`⚠️  AWS Lambda failed: ${error.message}`);
+    console.error(`❌ AWS Lambda failed for ${lead.website}:`, error.message);
+    console.error(`Full error:`, error);
   }
   await sleep(1000); // Rate limiting
 
@@ -422,40 +441,55 @@ export async function enrichLeadEmail(lead: Lead): Promise<EmailEnrichmentResult
   };
 }
 
-// 6. Batch Processing Function
-export async function enrichLeadsBatch(leads: Lead[], onProgress?: (progress: {completed: number, total: number, currentLead: string}) => void): Promise<EmailEnrichmentResult[]> {
-  const results: EmailEnrichmentResult[] = [];
+// 6. Batch Processing Function with Parallel Processing
+export async function enrichLeadsBatch(leads: Lead[], onProgress?: (progress: {completed: number, total: number, currentLead: string}) => void, concurrency: number = 5): Promise<EmailEnrichmentResult[]> {
+  const results: EmailEnrichmentResult[] = new Array(leads.length);
   
-  console.log(`\n🎯 Starting batch enrichment for ${leads.length} leads`);
+  console.log(`\n🎯 Starting parallel batch enrichment for ${leads.length} leads with concurrency: ${concurrency}`);
   
-  for (let i = 0; i < leads.length; i++) {
-    const lead = leads[i];
-    
-    // Update progress
-    if (onProgress) {
-      onProgress({
-        completed: i,
-        total: leads.length,
-        currentLead: lead.name
-      });
-    }
-
-    try {
-      const result = await enrichLeadEmail(lead);
-      results.push(result);
+  // Process leads in batches for parallel execution
+  for (let i = 0; i < leads.length; i += concurrency) {
+    const batch = leads.slice(i, i + concurrency);
+    const batchPromises = batch.map(async (lead, batchIndex) => {
+      const leadIndex = i + batchIndex;
       
-      // Rate limiting between requests
-      if (i < leads.length - 1) {
-        await sleep(2000); // 2 second delay between leads
+      try {
+        const result = await enrichLeadEmail(lead);
+        
+        // Update progress
+        if (onProgress) {
+          onProgress({
+            completed: leadIndex + 1,
+            total: leads.length,
+            currentLead: lead.name
+          });
+        }
+        
+        return { index: leadIndex, result };
+      } catch (error: any) {
+        console.error(`❌ Failed to enrich lead ${lead.name}:`, error);
+        return { 
+          index: leadIndex, 
+          result: {
+            email: 'Not Found',
+            email_status: 'not_found' as const,
+            source: 'none' as const
+          }
+        };
       }
-      
-    } catch (error: any) {
-      console.error(`❌ Failed to enrich lead ${lead.name}:`, error);
-      results.push({
-        email: 'Not Found',
-        email_status: 'not_found',
-        source: 'none'
-      });
+    });
+    
+    // Wait for current batch to complete
+    const batchResults = await Promise.all(batchPromises);
+    
+    // Store results in correct order
+    batchResults.forEach(({ index, result }) => {
+      results[index] = result;
+    });
+    
+    // Small delay between batches to avoid overwhelming APIs
+    if (i + concurrency < leads.length) {
+      await sleep(500); // Reduced from 2000ms to 500ms
     }
   }
   
@@ -468,6 +502,113 @@ export async function enrichLeadsBatch(leads: Lead[], onProgress?: (progress: {c
     });
   }
   
-  console.log(`\n✅ Batch enrichment completed: ${results.length} leads processed`);
+  console.log(`\n✅ Parallel batch enrichment completed: ${results.length} leads processed`);
   return results;
+}
+
+// 7. Fast Parallel Processing (Maximum Speed)
+export async function enrichLeadsFast(leads: Lead[], onProgress?: (progress: {completed: number, total: number, currentLead: string}) => void): Promise<EmailEnrichmentResult[]> {
+  const results: EmailEnrichmentResult[] = new Array(leads.length);
+  
+  console.log(`\n⚡ Starting ultra-fast enrichment for ${leads.length} leads`);
+  
+  // Process all leads in parallel with minimal delays
+  const promises = leads.map(async (lead, index) => {
+    try {
+      // Reduced sleep times for faster processing
+      const result = await enrichLeadEmailFast(lead);
+      
+      // Update progress
+      if (onProgress) {
+        onProgress({
+          completed: index + 1,
+          total: leads.length,
+          currentLead: lead.name
+        });
+      }
+      
+      return { index, result };
+    } catch (error: any) {
+      console.error(`❌ Failed to enrich lead ${lead.name}:`, error);
+      return { 
+        index, 
+        result: {
+          email: 'Not Found',
+          email_status: 'not_found' as const,
+          source: 'none' as const
+        }
+      };
+    }
+  });
+  
+  // Wait for all leads to complete
+  const allResults = await Promise.all(promises);
+  
+  // Store results in correct order
+  allResults.forEach(({ index, result }) => {
+    results[index] = result;
+  });
+  
+  // Final progress update
+  if (onProgress) {
+    onProgress({
+      completed: leads.length,
+      total: leads.length,
+      currentLead: 'Completed'
+    });
+  }
+  
+  console.log(`\n⚡ Ultra-fast enrichment completed: ${results.length} leads processed`);
+  return results;
+}
+
+// 8. Fast Enrichment Function (Reduced Delays)
+async function enrichLeadEmailFast(lead: Lead): Promise<EmailEnrichmentResult> {
+  console.log(`⚡ Fast enrichment for: ${lead.name} (${lead.website})`);
+
+  // Step 1: Try AWS Lambda Scraper (Primary) - No delay
+  try {
+    console.log(`1️⃣ Trying AWS Lambda for: ${lead.website}`);
+    const lambdaResult = await searchEmailsAWSLambda(lead.website, lead.name);
+    if (lambdaResult.email) {
+      console.log(`✅ Success with AWS Lambda: ${lambdaResult.email}`);
+      return lambdaResult;
+    }
+  } catch (error: any) {
+    console.log(`⚠️  AWS Lambda failed: ${error.message}`);
+  }
+  await sleep(200); // Reduced from 1000ms to 200ms
+
+  // Step 2: Try Hunter.io (Secondary) - Reduced delay
+  try {
+    console.log(`2️⃣ Trying Hunter.io for: ${lead.website}`);
+    const hunterResult = await searchEmailsHunter(lead.website);
+    if (hunterResult.email) {
+      console.log(`✅ Success with Hunter.io: ${hunterResult.email}`);
+      return hunterResult;
+    }
+  } catch (error: any) {
+    console.log(`⚠️  Hunter.io failed: ${error.message}`);
+  }
+  await sleep(200); // Reduced from 1000ms to 200ms
+
+  // Step 3: Try Snov.io (Tertiary) - Reduced delay
+  try {
+    console.log(`3️⃣ Trying Snov.io for: ${lead.website}`);
+    const snovResult = await searchEmailsSnov(lead.website);
+    if (snovResult.email) {
+      console.log(`✅ Success with Snov.io: ${snovResult.email}`);
+      return snovResult;
+    }
+  } catch (error: any) {
+    console.log(`⚠️  Snov.io failed: ${error.message}`);
+  }
+
+  // No email found anywhere
+  console.log(`❌ No email found for: ${lead.name} after trying all sources`);
+  return {
+    email: 'not_found',
+    email_status: 'not_found',
+    source: 'none'
+  };
 } 
