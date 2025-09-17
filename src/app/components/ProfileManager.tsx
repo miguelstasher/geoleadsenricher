@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface UserProfile {
   id: string;
@@ -16,6 +17,7 @@ interface ProfileManagerProps {
 }
 
 export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
+  const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -34,50 +36,37 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
 
   useEffect(() => {
     fetchUserAndProfile();
-  }, [currentUserId]);
+  }, [currentUserId, user]);
 
   const fetchUserAndProfile = async () => {
     try {
       setLoading(true);
       
-      // First, get the actual user ID from the database
-      const usersResponse = await fetch('/api/users');
-      if (usersResponse.ok) {
-        const users = await usersResponse.json();
-        if (users.length > 0) {
-          const userId = users[0].id;
-          setActualUserId(userId);
-          
-          // Now fetch the profile for this user
-          const profileResponse = await fetch(`/api/users/profile?userId=${userId}`);
-          if (profileResponse.ok) {
-            const profileData = await profileResponse.json();
-            setProfile(profileData);
-            setFormData({
-              first_name: profileData.first_name || '',
-              last_name: profileData.last_name || '',
-              email: profileData.email || '',
-              bio: profileData.bio || ''
-            });
-          } else {
-            // Profile doesn't exist yet, use the user data
-            setProfile(users[0]);
-            setFormData({
-              first_name: users[0].first_name || '',
-              last_name: users[0].last_name || '',
-              email: users[0].email || '',
-              bio: ''
-            });
-          }
-        } else {
-          // No users exist, set default form
-          setFormData({
-            first_name: 'Demo',
-            last_name: 'User',
-            email: 'demo@example.com',
-            bio: ''
-          });
-        }
+      if (user?.profile) {
+        // Use the authenticated user's profile data
+        setActualUserId(user.id);
+        setProfile({
+          id: user.id,
+          first_name: user.profile.first_name,
+          last_name: user.profile.last_name,
+          email: user.profile.email,
+          photo_url: user.profile.photo_url,
+          bio: ''
+        });
+        setFormData({
+          first_name: user.profile.first_name || '',
+          last_name: user.profile.last_name || '',
+          email: user.profile.email || '',
+          bio: ''
+        });
+      } else {
+        // Fallback to demo data if no user
+        setFormData({
+          first_name: 'Demo',
+          last_name: 'User',
+          email: 'demo@example.com',
+          bio: ''
+        });
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
