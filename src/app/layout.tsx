@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { NotificationProvider } from './components/SimpleNotificationProvider';
 import Navigation from './components/Navigation';
+import AuthWrapper from './components/AuthWrapper';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,10 +21,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <NotificationProvider>
-          <Navigation />
-          <main className="container mx-auto p-4">
-            {children}
-          </main>
+          <AuthWrapper>
+            <Navigation />
+            <main className="container mx-auto p-4">
+              {children}
+            </main>
+          </AuthWrapper>
         </NotificationProvider>
       </body>
     </html>

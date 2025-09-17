@@ -10,6 +10,7 @@ import EnrichmentNotification from '../components/EnrichmentNotification';
 import EmailVerificationNotification from '../components/EmailVerificationNotification';
 import { useSearchParams } from 'next/navigation';
 import RecordOwnerDisplay from '../components/RecordOwnerDisplay';
+import { useAuth } from '@/hooks/useAuth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,6 +42,13 @@ type Lead = {
   upload_status: string; // New field to track detailed upload status
   currency: string;
   chain: string; // Updated to match Supabase column name
+  // User ownership fields
+  created_by?: string;
+  owned_by?: string;
+  shared_with?: string[];
+  is_duplicate?: boolean;
+  duplicate_of?: string;
+  duplicate_count?: number;
 };
 
 // Utility function to detect if a lead is part of a chain based on website domain AND business name
@@ -131,6 +139,8 @@ function downloadCSV(leads: Lead[], columns: string[]) {
 }
 
 export default function LeadsClient() {
+  const { user } = useAuth();
+  
   // Initialize leads with empty array
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);

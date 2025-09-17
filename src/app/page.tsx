@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import GlobalFilters from './components/GlobalFilters';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 
 // Dashboard components
 const StatCard = ({ title, value, icon }: { title: string, value: string, icon: string }) => (
@@ -63,6 +64,11 @@ interface Lead {
 }
 
 export default function Home() {
+  const { user } = useAuth();
+  
+  // Dashboard view toggle
+  const [viewMode, setViewMode] = useState<'personal' | 'shared'>('personal');
+  
   // Load leads from Supabase instead of localStorage
   const [leads, setLeads] = useState<Lead[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -225,22 +231,32 @@ export default function Home() {
   
   // Calculate dashboard statistics whenever leads change
   useEffect(() => {
-    const totalLeads = leads.length;
+    // Filter leads based on view mode and user ownership
+    let filteredLeads = leads;
+    if (viewMode === 'personal' && user?.id) {
+      filteredLeads = leads.filter(lead => 
+        lead.created_by === user.id || 
+        lead.owned_by === user.id ||
+        (lead.shared_with && lead.shared_with.includes(user.id))
+      );
+    }
+    
+    const totalLeads = filteredLeads.length;
     
     // Social Media & Contact Enrichment Stats
-    const linkedinUrls = leads.filter(lead => 
+    const linkedinUrls = filteredLeads.filter(lead => 
       lead.linkedinUrl && 
       lead.linkedinUrl.trim() !== '' && 
       lead.linkedinUrl !== 'Not Found'
     ).length;
     
-    const facebookUrls = leads.filter(lead => 
+    const facebookUrls = filteredLeads.filter(lead => 
       lead.facebookUrl && 
       lead.facebookUrl.trim() !== '' && 
       lead.facebookUrl !== 'Not Found'
     ).length;
     
-    const emailAddresses = leads.filter(lead => 
+    const emailAddresses = filteredLeads.filter(lead => 
       lead.email && 
       lead.email.trim() !== '' && 
       lead.email !== 'Not Found' &&
@@ -248,59 +264,59 @@ export default function Home() {
     ).length;
     
     // Waiting for enrichment: leads that haven't been enriched with email yet
-    const waitingForEnrichment = leads.filter(lead => 
+    const waitingForEnrichment = filteredLeads.filter(lead => 
       lead.emailStatus?.toLowerCase() === 'unverified' ||
       (lead.email && lead.email.trim() !== '' && lead.email !== 'Not Found' && lead.email !== 'not_found' && 
        (!lead.emailStatus || lead.emailStatus.trim() === ''))
     ).length;
     
     // Email Status Breakdown
-    const validEmails = leads.filter(lead => 
+    const validEmails = filteredLeads.filter(lead => 
       lead.emailStatus?.toLowerCase() === 'verified' || 
       lead.emailStatus?.toLowerCase() === 'valid'
     ).length;
     
-    const invalidEmails = leads.filter(lead => 
+    const invalidEmails = filteredLeads.filter(lead => 
       lead.emailStatus?.toLowerCase() === 'invalid' || 
       lead.emailStatus?.toLowerCase() === 'bounced'
     ).length;
     
-    const notFoundEmails = leads.filter(lead => 
+    const notFoundEmails = filteredLeads.filter(lead => 
       lead.email === 'Not Found' || 
       lead.email === 'not_found' ||
       lead.emailStatus?.toLowerCase() === 'not_found'
     ).length;
     
-    const unverifiedEmails = leads.filter(lead => 
+    const unverifiedEmails = filteredLeads.filter(lead => 
       lead.emailStatus?.toLowerCase() === 'unverified' ||
       (lead.email && lead.email.trim() !== '' && lead.email !== 'Not Found' && lead.email !== 'not_found' && 
        (!lead.emailStatus || lead.emailStatus.trim() === ''))
     ).length;
     
     // Count leads without websites (cannot be enriched)
-    const leadsWithoutWebsite = leads.filter(lead => 
+    const leadsWithoutWebsite = filteredLeads.filter(lead => 
       !lead.website || lead.website.trim() === ''
     ).length;
     
     // Count leads without websites but with phone numbers (good for cold calling)
-    const leadsWithoutWebsiteButWithPhone = leads.filter(lead => 
+    const leadsWithoutWebsiteButWithPhone = filteredLeads.filter(lead => 
       (!lead.website || lead.website.trim() === '') && 
       (lead.phone && lead.phone.trim() !== '')
     ).length;
     
     // Count by different categories using dynamic chain detection (same as leads page)
-    const totalChains = leads.filter(lead => detectChainStatus(lead.website, chainEntries)).length;
+    const totalChains = filteredLeads.filter(lead => detectChainStatus(lead.website, chainEntries)).length;
     const totalIndependent = totalLeads - totalChains;
     
     // Count active campaigns from the campaigns table (Live status)
     const activeCampaigns = campaigns.filter(campaign => campaign.status === 'Live').length;
     
     // Calculate duplicates
-    const { totalDuplicates, duplicateGroups } = calculateDuplicates(leads);
+    const { totalDuplicates, duplicateGroups } = calculateDuplicates(filteredLeads);
     
     // Count by countries for potential visualization
     const countries: Record<string, number> = {};
-    leads.forEach(lead => {
+    filteredLeads.forEach(lead => {
       const country = lead.country;
       if (country) {
         countries[country] = (countries[country] || 0) + 1;
@@ -326,7 +342,7 @@ export default function Home() {
       duplicateGroups,
       countries
     });
-  }, [leads, campaigns, chainEntries]); // Add campaigns dependency
+  }, [leads, campaigns, chainEntries, viewMode, user]); // Add viewMode and user dependencies
   
   const [formattedDates, setFormattedDates] = useState<{[key: string]: string}>({});
   
@@ -490,7 +506,41 @@ export default function Home() {
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold mb-4">Dashboard Overview</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Dashboard Overview</h2>
+          
+          {/* View Mode Toggle */}
+          <div className="flex items-center space-x-4">
+            <span className="text-sm font-medium text-gray-700">View:</span>
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('personal')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                  viewMode === 'personal'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                My Leads
+              </button>
+              <button
+                onClick={() => setViewMode('shared')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                  viewMode === 'shared'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                All Leads
+              </button>
+            </div>
+            {user?.profile && (
+              <div className="text-sm text-gray-500">
+                Logged in as <span className="font-medium text-gray-700">{user.profile.first_name}</span>
+              </div>
+            )}
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <StatCard 
             title="Total Leads" 
