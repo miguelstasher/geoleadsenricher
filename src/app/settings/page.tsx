@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import CategoryPacksManager from './CategoryPacksManager';
 import BusinessCategoryGroupsManager from './BusinessCategoryGroupsManager';
 import ProfileManager from '../components/ProfileManager';
+import { useAuth } from '@/hooks/useAuth';
 
 // Add type definition for CategoryGroup
 type CategoryGroup = {
@@ -13,6 +15,19 @@ type CategoryGroup = {
 };
 
 export default function SettingsPage() {
+  const { signOut } = useAuth();
+  const router = useRouter();
+  
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.push('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   // State for business categories management
   const [categories, setCategories] = useState<string[]>([
     "Airbnb Management", "Airport", "Amusement Park", "Antique Shop", "Aparthotel", 
@@ -619,6 +634,19 @@ export default function SettingsPage() {
                 API Settings
               </button>
             </nav>
+            
+            {/* Logout Button */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Sign Out
+              </button>
+            </div>
           </div>
 
           {/* Main Content Area */}

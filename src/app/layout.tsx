@@ -2,14 +2,20 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { NotificationProvider } from './components/SimpleNotificationProvider';
-import Navigation from './components/Navigation';
-import AuthWrapper from './components/AuthWrapper';
+import ConditionalNavigation from './components/ConditionalNavigation';
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "GeoLeads Enricher",
-  description: "Sales tool for lead generation and enrichment",
+  description: "Professional sales tool for lead generation and enrichment",
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export default function RootLayout({
@@ -21,10 +27,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <NotificationProvider>
-          <Navigation />
-          <main className="container mx-auto p-4">
+          <ConditionalNavigation>
             {children}
-          </main>
+          </ConditionalNavigation>
         </NotificationProvider>
       </body>
     </html>
