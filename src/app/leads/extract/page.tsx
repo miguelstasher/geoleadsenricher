@@ -168,7 +168,7 @@ export default function ExtractLeadsPage() {
         other_categories: otherCategories || null,
         selected_group: selectedGroup || null,
         currency: currency,
-        created_by: user?.profile?.email || null, // Use authenticated user email
+        created_by: user?.profile?.email || user?.email || 'miguel@citystasher.com', // Use authenticated user email
         total_results: 0, // Will be updated during processing
         results: null, // Will be populated when completed
         status: 'pending' as const

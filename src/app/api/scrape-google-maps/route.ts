@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       searchId,
       searchData
     };
-    // Send to Supabase Edge Function (no timeout limits!)
+    // Try Supabase Edge Function first, fallback to original system
     const SUPABASE_FUNCTION_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/google-maps-extraction`;
     
     const functionPayload = {
@@ -57,14 +57,41 @@ export async function POST(request: NextRequest) {
       searchData: searchData
     };
 
-    // Fire and forget - Supabase Edge Function handles everything with no timeout limits
-    const jobResponse = await fetch(SUPABASE_FUNCTION_URL, {
+    try {
+      // Try Supabase Edge Function (no timeout limits!)
+      const jobResponse = await fetch(SUPABASE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify(functionPayload)
+      });
+
+      if (jobResponse.ok) {
+        console.log('✅ Supabase Edge Function started successfully');
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Google Maps extraction started successfully',
+          searchId: searchId
+        });
+      } else {
+        console.log('⚠️ Supabase Edge Function failed, falling back to original system');
+      }
+    } catch (error) {
+      console.log('⚠️ Supabase Edge Function error, falling back to original system:', error);
+    }
+
+    // Fallback: Use original background job system
+    const jobResponse = await fetch(`${request.nextUrl.origin}/api/jobs`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
       },
-      body: JSON.stringify(functionPayload)
+      body: JSON.stringify({
+        type: jobType,
+        params: jobParams
+      })
     });
 
     if (!jobResponse.ok) {
