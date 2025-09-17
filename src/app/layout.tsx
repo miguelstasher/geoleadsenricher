@@ -28,9 +28,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <NotificationProvider>
-          <ConditionalNavigation>
-            {children}
-          </ConditionalNavigation>
+          <AuthWrapper>
+            <ConditionalNavigation>
+              {children}
+            </ConditionalNavigation>
+          </AuthWrapper>
         </NotificationProvider>
       </body>
     </html>
