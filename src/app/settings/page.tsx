@@ -105,15 +105,25 @@ export default function SettingsPage() {
   const [csvUploadSuccess, setCsvUploadSuccess] = useState(false);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
   
-  // State for users management
-  const [users, setUsers] = useState<{id: string, name: string, email: string, role: string}[]>([
-    { id: '1', name: 'Admin User', email: 'admin@example.com', role: 'admin' },
-    { id: '2', name: 'Sales User', email: 'sales@example.com', role: 'sales' },
-    { id: '3', name: 'Viewer User', email: 'viewer@example.com', role: 'viewer' }
-  ]);
+  // State for users management - start with authenticated user
+  const [users, setUsers] = useState<{id: string, name: string, email: string, role: string}[]>([]);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState('viewer');
+  const [newUserRole, setNewUserRole] = useState('standard');
+  const [isInviting, setIsInviting] = useState(false);
+
+  // Load authenticated user into users list
+  useEffect(() => {
+    if (user?.profile) {
+      setUsers([{
+        id: user.id,
+        name: `${user.profile.first_name} ${user.profile.last_name}`,
+        email: user.profile.email,
+        role: user.profile.role || 'admin'
+      }]);
+    }
+  }, [user]);
+
   const [editingUser, setEditingUser] = useState<{index: number, user: {id: string, name: string, email: string, role: string}} | null>(null);
   const [userSavedSuccess, setUserSavedSuccess] = useState(false);
 
@@ -178,6 +188,54 @@ export default function SettingsPage() {
     setTimeout(() => {
       setShowNotification(false);
     }, 3000);
+  };
+
+  // Real user invitation system using Supabase Auth
+  const inviteUser = async () => {
+    if (!newUserName.trim() || !newUserEmail.trim()) {
+      showSaveNotification('Please fill in all fields');
+      return;
+    }
+
+    if (!isAdmin) {
+      showSaveNotification('Only administrators can invite users');
+      return;
+    }
+
+    try {
+      setIsInviting(true);
+      
+      // Send invitation email via Supabase Admin API
+      const response = await fetch('/api/users/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: newUserEmail.trim(),
+          role: newUserRole,
+          first_name: newUserName.split(' ')[0] || newUserName,
+          last_name: newUserName.split(' ').slice(1).join(' ') || ''
+        }),
+      });
+
+      if (response.ok) {
+        showSaveNotification(`Invitation sent to ${newUserEmail}! They will receive an email to set up their account.`);
+        
+        // Clear form
+        setNewUserName('');
+        setNewUserEmail('');
+        setNewUserRole('standard');
+      } else {
+        const error = await response.json();
+        showSaveNotification(error.message || 'Failed to send invitation');
+      }
+    } catch (error) {
+      console.error('Error sending invitation:', error);
+      showSaveNotification('Error sending invitation');
+    } finally {
+      setIsInviting(false);
+    }
   };
 
   // Load saved chain entries and categories from localStorage on component mount
@@ -616,26 +674,31 @@ export default function SettingsPage() {
               >
                 Chain Management
               </button>
-              <button
-                onClick={() => handleSectionChange('users')}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
-                  activeSection === 'users'
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Users Management
-              </button>
-              <button
-                onClick={() => handleSectionChange('api')}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
-                  activeSection === 'api'
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                API Settings
-              </button>
+              {/* Admin-only sections */}
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={() => handleSectionChange('users')}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                      activeSection === 'users'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Users Management
+                  </button>
+                  <button
+                    onClick={() => handleSectionChange('api')}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                      activeSection === 'api'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    API Settings
+                  </button>
+                </>
+              )}
             </nav>
             
             {/* Logout Button */}
@@ -1047,44 +1110,55 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* Users Section */}
-            {activeSection === 'users' && (
+            {/* Users Section - Admin Only */}
+            {activeSection === 'users' && isAdmin && (
               <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-xl font-semibold mb-4">Users Management</h2>
                 
-                {/* Add New User Form */}
+                {/* Send User Invitation Form */}
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-lg font-medium mb-4">Add New User</h3>
+                  <h3 className="text-lg font-medium mb-4">📧 Send User Invitation</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Send an invitation email to a new user. They will receive an email to create their account and set their password.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <input
                       type="text"
-                      placeholder="Name"
-                      value={newUserName ?? ''}
+                      placeholder="Full Name (e.g., Kelly Kelsey)"
+                      value={newUserName}
                       onChange={(e) => setNewUserName(e.target.value)}
-                      className="border rounded-md px-3 py-2"
+                      className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <input
                       type="email"
-                      placeholder="Email"
-                      value={newUserEmail ?? ''}
+                      placeholder="Email Address"
+                      value={newUserEmail}
                       onChange={(e) => setNewUserEmail(e.target.value)}
-                      className="border rounded-md px-3 py-2"
+                      className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <select
-                      value={newUserRole ?? ''}
+                      value={newUserRole}
                       onChange={(e) => setNewUserRole(e.target.value)}
-                      className="border rounded-md px-3 py-2"
+                      className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="admin">Admin</option>
-                      <option value="sales">Sales</option>
-                      <option value="viewer">Viewer</option>
+                      <option value="standard">👤 Standard User</option>
+                      <option value="reader">👁️ Reader</option>
+                      <option value="admin">👑 Administrator</option>
                     </select>
                   </div>
                   <button
-                    onClick={addUser}
-                    className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    onClick={inviteUser}
+                    disabled={isInviting}
+                    className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Add User
+                    {isInviting ? (
+                      <div className="flex items-center">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Sending Invitation...
+                      </div>
+                    ) : (
+                      '📧 Send Invitation'
+                    )}
                   </button>
                 </div>
 

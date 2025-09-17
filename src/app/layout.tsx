@@ -12,10 +12,8 @@ export const metadata: Metadata = {
   description: "Professional sales tool for lead generation and enrichment",
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: 'any' },
       { url: '/icon.svg', type: 'image/svg+xml' },
     ],
-    apple: '/apple-touch-icon.png',
   },
 };
 
