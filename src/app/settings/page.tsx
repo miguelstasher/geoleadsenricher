@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
 import CategoryPacksManager from './CategoryPacksManager';
 import BusinessCategoryGroupsManager from './BusinessCategoryGroupsManager';
 import ProfileManager from '../components/ProfileManager';
-import { useAuth } from '@/hooks/useAuth';
 
 // Add type definition for CategoryGroup
 type CategoryGroup = {
@@ -27,6 +27,9 @@ export default function SettingsPage() {
       console.error('Error signing out:', error);
     }
   };
+
+  // Check if current user is admin
+  const isAdmin = user?.profile?.role === 'admin';
 
   // State for business categories management
   const [categories, setCategories] = useState<string[]>([
@@ -102,28 +105,17 @@ export default function SettingsPage() {
   const [csvUploadSuccess, setCsvUploadSuccess] = useState(false);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
   
-  // State for users management - use real authenticated users
-  const [users, setUsers] = useState<{id: string, name: string, email: string, role: string}[]>([]);
+  // State for users management
+  const [users, setUsers] = useState<{id: string, name: string, email: string, role: string}[]>([
+    { id: '1', name: 'Admin User', email: 'admin@example.com', role: 'admin' },
+    { id: '2', name: 'Sales User', email: 'sales@example.com', role: 'sales' },
+    { id: '3', name: 'Viewer User', email: 'viewer@example.com', role: 'viewer' }
+  ]);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState('standard');
+  const [newUserRole, setNewUserRole] = useState('viewer');
   const [editingUser, setEditingUser] = useState<{index: number, user: {id: string, name: string, email: string, role: string}} | null>(null);
   const [userSavedSuccess, setUserSavedSuccess] = useState(false);
-
-  // Check if current user is admin
-  const isAdmin = user?.profile?.role === 'admin';
-
-  // Load authenticated user into users list
-  useEffect(() => {
-    if (user?.profile) {
-      setUsers([{
-        id: user.id,
-        name: `${user.profile.first_name} ${user.profile.last_name}`,
-        email: user.profile.email,
-        role: user.profile.role || 'user'
-      }]);
-    }
-  }, [user]);
 
   // State for profile management
   const [profile, setProfile] = useState({
@@ -186,50 +178,6 @@ export default function SettingsPage() {
     setTimeout(() => {
       setShowNotification(false);
     }, 3000);
-  };
-
-  // User invitation system
-  const addUser = async () => {
-    if (!newUserName || !newUserEmail) {
-      showSaveNotification('Please fill in all fields');
-      return;
-    }
-
-    try {
-      // For now, add to local state - in a real system you'd send invitation email
-      const newUser = {
-        id: Date.now().toString(),
-        name: newUserName,
-        email: newUserEmail,
-        role: newUserRole
-      };
-
-      setUsers(prev => [...prev, newUser]);
-      
-      // Clear form
-      setNewUserName('');
-      setNewUserEmail('');
-      setNewUserRole('standard');
-      
-      showSaveNotification(`Invitation sent to ${newUserEmail}! (Demo: User added locally)`);
-    } catch (error) {
-      console.error('Error adding user:', error);
-      showSaveNotification('Error adding user');
-    }
-  };
-
-  // Function to remove user
-  const removeUser = (userId: string) => {
-    setUsers(prev => prev.filter(user => user.id !== userId));
-    showSaveNotification('User removed successfully');
-  };
-
-  // Function to update user role
-  const updateUserRole = async (userId: string, newRole: string) => {
-    setUsers(prev => prev.map(user => 
-      user.id === userId ? { ...user, role: newRole } : user
-    ));
-    showSaveNotification('User role updated successfully');
   };
 
   // Load saved chain entries and categories from localStorage on component mount
@@ -668,31 +616,26 @@ export default function SettingsPage() {
               >
                 Chain Management
               </button>
-              {/* Admin-only sections */}
-              {isAdmin && (
-                <>
-                  <button
-                    onClick={() => handleSectionChange('users')}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
-                      activeSection === 'users'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    Users Management
-                  </button>
-                  <button
-                    onClick={() => handleSectionChange('api')}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
-                      activeSection === 'api'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    API Settings
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => handleSectionChange('users')}
+                className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                  activeSection === 'users'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                Users Management
+              </button>
+              <button
+                onClick={() => handleSectionChange('api')}
+                className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                  activeSection === 'api'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                API Settings
+              </button>
             </nav>
             
             {/* Logout Button */}
@@ -1104,8 +1047,8 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* Users Section - Admin Only */}
-            {activeSection === 'users' && isAdmin && (
+            {/* Users Section */}
+            {activeSection === 'users' && (
               <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-xl font-semibold mb-4">Users Management</h2>
                 
@@ -1132,9 +1075,9 @@ export default function SettingsPage() {
                       onChange={(e) => setNewUserRole(e.target.value)}
                       className="border rounded-md px-3 py-2"
                     >
-                      <option value="standard">Standard</option>
-                      <option value="reader">Reader</option>
                       <option value="admin">Admin</option>
+                      <option value="sales">Sales</option>
+                      <option value="viewer">Viewer</option>
                     </select>
                   </div>
                   <button
@@ -1199,19 +1142,17 @@ export default function SettingsPage() {
                                 })}
                                 className="border rounded-md px-2 py-1"
                               >
-                                <option value="admin">👑 Admin</option>
-                                <option value="standard">👤 Standard</option>
-                                <option value="reader">👁️ Reader</option>
+                                <option value="admin">Admin</option>
+                                <option value="sales">Sales</option>
+                                <option value="viewer">Viewer</option>
                               </select>
                             ) : (
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                user.role === 'admin' ? 'bg-red-100 text-red-800 border border-red-200' :
-                                user.role === 'standard' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                                'bg-gray-100 text-gray-800 border border-gray-200'
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                                user.role === 'sales' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
                               }`}>
-                                {user.role === 'admin' ? '👑 Administrator' :
-                                 user.role === 'standard' ? '👤 Standard User' :
-                                 '👁️ Reader'}
+                                {user.role}
                               </span>
                             )}
                           </td>
@@ -1240,9 +1181,8 @@ export default function SettingsPage() {
                                   Edit
                                 </button>
                                 <button
-                                  onClick={() => removeUser(user.id)}
+                                  onClick={() => removeUser(index)}
                                   className="text-red-600 hover:text-red-900"
-                                  disabled={user.email === 'miguel@stasher.com'} // Prevent admin self-deletion
                                 >
                                   Remove
                                 </button>
@@ -1257,8 +1197,8 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* API Settings Section - Admin Only */}
-            {activeSection === 'api' && isAdmin && (
+            {/* API Settings Section */}
+            {activeSection === 'api' && (
               <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-xl font-semibold mb-4">API Integration Settings</h2>
                 <p className="text-gray-600 mb-6">
