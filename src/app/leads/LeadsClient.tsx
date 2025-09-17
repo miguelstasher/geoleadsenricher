@@ -2075,8 +2075,8 @@ export default function LeadsClient() {
       setToastMessage(`Uploading ${selectedLeads.length} leads to "${campaignName}"...`);
       setIsToastVisible(true);
 
-      // Call the upload API
-      const response = await fetch('/api/campaigns/upload', {
+      // Call the enhanced upload API (uses Supabase Edge Function)
+      const response = await fetch('/api/campaigns/upload-enhanced', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2360,14 +2360,13 @@ export default function LeadsClient() {
         return;
       }
 
-      const response = await fetch('/api/enrich-leads', {
+      const response = await fetch('/api/enrich-leads-enhanced', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          leadIds: leadsToEnrich.map(lead => lead.id),
-  
+          leadIds: leadsToEnrich.map(lead => lead.id)
         })
       });
 
@@ -2392,13 +2391,14 @@ export default function LeadsClient() {
       setIsToastVisible(true);
       setTimeout(() => setIsToastVisible(false), 3000);
 
-      const response = await fetch('/api/enrich-linkedin', {
+      const response = await fetch('/api/social-enhanced', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          leadIds: selectedLeads
+          leadIds: selectedLeads,
+          platform: 'linkedin'
         })
       });
 
@@ -2435,13 +2435,14 @@ export default function LeadsClient() {
       setIsToastVisible(true);
       setTimeout(() => setIsToastVisible(false), 3000);
 
-      const response = await fetch('/api/enrich-facebook', {
+      const response = await fetch('/api/social-enhanced', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          leadIds: selectedLeads
+          leadIds: selectedLeads,
+          platform: 'facebook'
         })
       });
 
