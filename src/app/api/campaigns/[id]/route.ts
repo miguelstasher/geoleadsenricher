@@ -8,10 +8,10 @@ const supabase = createClient(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(
@@ -42,7 +42,26 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(campaign);
+    // Count leads that have been successfully uploaded to this campaign
+    // We count leads where campaign name matches AND campaign_status is 'sent' (successfully uploaded)
+    const { count: uploadedLeadsCount, error: countError } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('campaign', campaign.name)
+      .eq('campaign_status', 'sent');
+
+    if (countError) {
+      console.error('Error counting uploaded leads:', countError);
+      // Don't fail the request, just return 0 for the count
+    }
+
+    // Add the uploaded leads count to the campaign data
+    const campaignWithCount = {
+      ...campaign,
+      uploadedLeadsCount: uploadedLeadsCount || 0
+    };
+
+    return NextResponse.json(campaignWithCount);
 
   } catch (error: any) {
     console.error('Error in campaign fetch endpoint:', error);

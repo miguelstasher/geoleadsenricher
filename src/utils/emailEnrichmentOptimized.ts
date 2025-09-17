@@ -1,6 +1,42 @@
 import axios from 'axios';
 
-// Original working email enrichment function
+// Helper function to sleep
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Function to verify email with Hunter.io
+async function verifyEmailWithHunter(email: string): Promise<{status: string, score: number}> {
+  try {
+    console.log(`  🔍 Verifying email with Hunter.io: ${email}`);
+    
+    const response = await axios.get(
+      `https://api.hunter.io/v2/email-verifier?email=${email}&api_key=${process.env.HUNTER_API_KEY}`,
+      { timeout: 10000 }
+    );
+
+    if (response.data && response.data.data) {
+      const result = response.data.data;
+      const score = result.score || 0;
+      
+      // Determine status based on confidence score
+      if (score >= 80) {
+        return { status: 'Valid', score };
+      } else if (score >= 50) {
+        return { status: 'Unverified', score };
+      } else {
+        return { status: 'Invalid', score };
+      }
+    }
+    
+    return { status: 'Unverified', score: 0 };
+  } catch (error) {
+    console.error(`  ❌ Hunter.io verification failed for ${email}:`, error);
+    return { status: 'Unverified', score: 0 };
+  }
+}
+
+// Sequential waterfall email enrichment function (Lambda → Hunter → Snov)
 export async function enrichLeadEmailOptimized(lead: any): Promise<any> {
   const { name, website } = lead;
   
@@ -16,25 +52,46 @@ export async function enrichLeadEmailOptimized(lead: any): Promise<any> {
     const lambdaResult = await tryAWSLambdaScraper(website, name);
     if (lambdaResult && lambdaResult.email && lambdaResult.email !== 'not_found') {
       console.log(`  ✅ AWS Lambda found: ${lambdaResult.email}`);
-      return { ...lead, email: lambdaResult.email, email_status: 'verified' };
+      // Verify the email with Hunter.io
+      const verifiedResult = await verifyEmailWithHunter(lambdaResult.email);
+      return { 
+        ...lead, 
+        email: lambdaResult.email, 
+        email_status: verifiedResult.status,
+        confidence_score: verifiedResult.score
+      };
     }
 
-    // Step 2: Try Hunter.io
+    // Step 2: Try Hunter.io (only if Lambda failed)
     console.log(`  📡 Step 2: Trying Hunter.io...`);
     await sleep(2000); // Wait 2 seconds between APIs
     const hunterResult = await tryHunterIO(website, name);
     if (hunterResult && hunterResult.email && hunterResult.email !== 'not_found') {
       console.log(`  ✅ Hunter.io found: ${hunterResult.email}`);
-      return { ...lead, email: hunterResult.email, email_status: 'verified' };
+      // Hunter.io already provides verification, but double-check
+      const verifiedResult = await verifyEmailWithHunter(hunterResult.email);
+      return { 
+        ...lead, 
+        email: hunterResult.email, 
+        email_status: verifiedResult.status,
+        confidence_score: verifiedResult.score
+      };
     }
 
-    // Step 3: Try Snov.io
+    // Step 3: Try Snov.io (only if Lambda and Hunter failed)
     console.log(`  📡 Step 3: Trying Snov.io...`);
     await sleep(2000); // Wait 2 seconds between APIs
     const snovResult = await trySnovIO(website, name);
     if (snovResult && snovResult.email && snovResult.email !== 'not_found') {
       console.log(`  ✅ Snov.io found: ${snovResult.email}`);
-      return { ...lead, email: snovResult.email, email_status: 'verified' };
+      // Verify the email with Hunter.io
+      const verifiedResult = await verifyEmailWithHunter(snovResult.email);
+      return { 
+        ...lead, 
+        email: snovResult.email, 
+        email_status: verifiedResult.status,
+        confidence_score: verifiedResult.score
+      };
     }
 
     console.log(`  ❌ No email found after trying all 3 methods`);
@@ -46,7 +103,7 @@ export async function enrichLeadEmailOptimized(lead: any): Promise<any> {
   }
 }
 
-// AWS Lambda scraper function - ORIGINAL WORKING VERSION
+// AWS Lambda scraper function - UPDATED TO MATCH AIRTABLE SCRIPT
 async function tryAWSLambdaScraper(website: string, name: string): Promise<any> {
   try {
     console.log(`  🔗 Calling AWS Lambda for: ${website}`);
@@ -54,13 +111,12 @@ async function tryAWSLambdaScraper(website: string, name: string): Promise<any> 
     const response = await axios.post(
       process.env.AWS_LAMBDA_EMAIL_SCRAPER_URL!,
       {
-        website: website,
-        name: name
+        website: website
       },
       {
         headers: {
-          'Authorization': `Bearer ${process.env.AWS_LAMBDA_AUTH_TOKEN}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': process.env.AWS_LAMBDA_AUTH_TOKEN!
         },
         timeout: 30000
       }
@@ -68,8 +124,10 @@ async function tryAWSLambdaScraper(website: string, name: string): Promise<any> 
 
     console.log(`  📥 AWS Lambda response:`, response.data);
 
-    // Original simple check that was working
-    if (response.data && response.data.email && response.data.email !== 'not_found') {
+    // Check for valid email (matching Airtable script logic)
+    if (response.data && response.data.email && 
+        response.data.email !== "No email found" && 
+        !response.data.email.includes('Error')) {
       console.log(`  ✅ AWS Lambda found email: ${response.data.email}`);
       return { email: response.data.email, email_status: 'verified' };
     }
@@ -237,7 +295,3 @@ export async function enrichLeadsBatchUltraFast(
   return results;
 }
 
-// Utility function for delays
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}

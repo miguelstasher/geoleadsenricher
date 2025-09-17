@@ -43,12 +43,45 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', searchId);
 
-    // Start the scraping process in the background
-    processGoogleMapsScraping(searchId, searchData).catch(error => {
-      console.error('Background scraping error:', error);
+    // Create background job
+    const jobType = searchData.search_method === 'city' ? 'city_extraction' : 'coordinates_extraction';
+    const jobParams = {
+      searchId,
+      searchData
+    };
+
+    // Create job via the jobs API
+    const jobResponse = await fetch(`${request.nextUrl.origin}/api/jobs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: jobType,
+        params: jobParams
+      })
     });
 
-    return NextResponse.json({ success: true, message: 'Scraping started' });
+    if (!jobResponse.ok) {
+      const errorData = await jobResponse.json();
+      return NextResponse.json({ error: errorData.error || 'Failed to create background job' }, { status: 500 });
+    }
+
+    const { jobId } = await jobResponse.json();
+
+    // Update search history with job reference
+    await supabase
+      .from('search_history')
+      .update({ 
+        job_id: jobId
+      })
+      .eq('id', searchId);
+
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Background extraction started',
+      jobId: jobId
+    });
 
   } catch (error) {
     console.error('Error starting scraping:', error);
@@ -136,8 +169,15 @@ async function processGoogleMapsScraping(searchId: string, searchData: any) {
         // Format for database
         const leadData = formatPlaceForDatabase(placeDetails, place.category || 'Business', {
           currency: searchData.currency,
-          created_by: searchData.created_by
+          created_by: searchData.created_by,
+          targetCity: searchData.city // Pass the target city for validation
         });
+
+        // Skip if leadData is null (place not in target city)
+        if (!leadData) {
+          console.log(`Skipping place "${place.name}" - not in target city`);
+          continue;
+        }
 
         // Check if lead already exists (prevent duplicates)
         // TEMPORARILY DISABLED: Allow duplicates to be added

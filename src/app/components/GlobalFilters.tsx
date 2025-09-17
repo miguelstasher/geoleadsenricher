@@ -67,8 +67,10 @@ export default function GlobalFilters({
   ];
 
   // Handle adding a custom filter
-  const handleAddCustomFilter = (field: string, operator: string, value: string) => {
-    const updatedFilters = [...selectedFilters.customFilters, { field, operator, value }];
+  const handleAddCustomFilter = (field: string, operator: string, value: string | string[]) => {
+    // Convert array values to string for storage (consistent with LeadsClient)
+    const filterValue = Array.isArray(value) ? JSON.stringify(value) : value;
+    const updatedFilters = [...selectedFilters.customFilters, { field, operator, value: filterValue }];
     onFilterChange('customFilters', updatedFilters);
   };
 

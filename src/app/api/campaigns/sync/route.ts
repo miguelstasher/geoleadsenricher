@@ -23,15 +23,82 @@ interface CampaignUpdate {
   status: string;
 }
 
+// Function to get API keys from settings
+async function getApiKeys() {
+  try {
+    // First try to get from settings table
+    const { data, error } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'api_keys')
+      .single();
+
+    if (error) {
+      // If settings table doesn't exist or other error, log it and continue to fallbacks
+      console.log('Settings table error (will use fallback):', error.message);
+    } else if (data) {
+      const apiKeys = JSON.parse(data.value);
+      // If we have API keys from settings, use them
+      if (apiKeys.instantly) {
+        console.log('Using Instantly API key from settings table');
+        return apiKeys;
+      }
+    }
+
+    // Fallback to environment variables
+    if (process.env.INSTANTLY_API_KEY) {
+      console.log('Using Instantly API key from environment variable');
+      return {
+        hunter: process.env.HUNTER_API_KEY || '',
+        snov: process.env.SNOV_API_KEY || '',
+        instantly: process.env.INSTANTLY_API_KEY,
+        googleMaps: process.env.GOOGLE_MAPS_API_KEY || ''
+      };
+    }
+
+    // Final fallback to the hardcoded API key from script.js
+    console.log('Using hardcoded Instantly API key as fallback');
+    return {
+      hunter: '',
+      snov: '',
+      instantly: 'Tb5OWIKAEMen7IrvsJxOBPnEgWnLG',
+      googleMaps: ''
+    };
+
+  } catch (error) {
+    console.error('Error getting API keys:', error);
+    
+    // Fallback to environment variables
+    if (process.env.INSTANTLY_API_KEY) {
+      console.log('Using Instantly API key from environment variable (fallback)');
+      return {
+        hunter: process.env.HUNTER_API_KEY || '',
+        snov: process.env.SNOV_API_KEY || '',
+        instantly: process.env.INSTANTLY_API_KEY,
+        googleMaps: process.env.GOOGLE_MAPS_API_KEY || ''
+      };
+    }
+    
+    // Final fallback to the hardcoded API key
+    console.log('Using hardcoded Instantly API key as final fallback');
+    return {
+      hunter: '',
+      snov: '',
+      instantly: 'Tb5OWIKAEMen7IrvsJxOBPnEgWnLG',
+      googleMaps: ''
+    };
+  }
+}
+
 // Function to fetch campaigns from Instantly API with retry logic
-async function fetchInstantlyCampaignsWithRetry(skip: number, limit: number, maxRetries: number = 3): Promise<InstantlyCampaign[] | null> {
+async function fetchInstantlyCampaignsWithRetry(skip: number, limit: number, apiKey: string, maxRetries: number = 3): Promise<InstantlyCampaign[] | null> {
   let retryCount = 0;
   
   while (retryCount < maxRetries) {
     try {
       console.log(`Attempt ${retryCount + 1} to fetch campaigns batch starting at ${skip}...`);
       
-      const response = await fetch(`https://api.instantly.ai/api/v1/campaign/list?api_key=${process.env.INSTANTLY_API_KEY}&skip=${skip}&limit=${limit}`, {
+      const response = await fetch(`https://api.instantly.ai/api/v1/campaign/list?api_key=${apiKey}&skip=${skip}&limit=${limit}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -76,42 +143,36 @@ async function fetchInstantlyCampaignsWithRetry(skip: number, limit: number, max
 }
 
 // Function to fetch all campaigns from Instantly API
-async function fetchAllInstantlyCampaigns(): Promise<InstantlyCampaign[]> {
+async function fetchAllInstantlyCampaigns(apiKey: string): Promise<InstantlyCampaign[]> {
   const allCampaigns: InstantlyCampaign[] = [];
   let skip = 0;
   const limit = 100; // Maximum limit as per API documentation
 
   while (true) {
-    const campaigns = await fetchInstantlyCampaignsWithRetry(skip, limit);
+    const campaigns = await fetchInstantlyCampaignsWithRetry(skip, limit, apiKey);
     
-    if (campaigns === null) {
-      console.log('Failed to fetch campaigns after retries');
-      return [];
-    }
-
-    console.log(`Fetched ${campaigns.length} campaigns in this batch`);
-    
-    if (campaigns.length === 0) {
+    if (!campaigns || campaigns.length === 0) {
       break; // Exit loop if no more campaigns are returned
     }
 
     allCampaigns.push(...campaigns);
     skip += limit; // Increment skip for the next batch
-    
-    // Add a small delay to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
-  console.log(`Total campaigns fetched: ${allCampaigns.length}`);
   return allCampaigns;
 }
 
 export async function POST() {
   try {
-    // Check if INSTANTLY_API_KEY is configured
-    if (!process.env.INSTANTLY_API_KEY) {
+    // Get API keys from settings
+    const apiKeys = await getApiKeys();
+    
+    if (!apiKeys || !apiKeys.instantly) {
       return NextResponse.json(
-        { error: 'Instantly API key not configured' },
+        { 
+          error: 'Instantly API key not configured. Please run the SQL script to create the settings table, or configure the API key in Settings.',
+          details: 'The system tried to use fallback methods but could not find a valid Instantly API key.'
+        },
         { status: 500 }
       );
     }
@@ -119,7 +180,7 @@ export async function POST() {
     console.log('Starting campaign sync from Instantly...');
 
     // Fetch all campaigns from Instantly
-    const instantlyCampaigns = await fetchAllInstantlyCampaigns();
+    const instantlyCampaigns = await fetchAllInstantlyCampaigns(apiKeys.instantly);
     if (instantlyCampaigns.length === 0) {
       console.log('No campaigns were fetched from Instantly. Please check the API key and try again later.');
       return NextResponse.json({

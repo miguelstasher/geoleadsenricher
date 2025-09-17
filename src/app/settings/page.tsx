@@ -134,6 +134,14 @@ export default function SettingsPage() {
   // Add new state for active section
   const [activeSection, setActiveSection] = useState('profile');
 
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState({
+    hunter: '',
+    snov: '',
+    instantly: '',
+    googleMaps: ''
+  });
+
   // 1. Add hasUnsavedChanges state
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
@@ -166,6 +174,11 @@ export default function SettingsPage() {
       if (savedCategories) {
         const parsed = JSON.parse(savedCategories);
         setCategories(Array.isArray(parsed) ? parsed : []);
+      }
+
+      const savedApiKeys = localStorage.getItem('apiKeys');
+      if (savedApiKeys) {
+        setApiKeys(JSON.parse(savedApiKeys));
       }
     } catch (error) {
       console.error('Error loading saved data:', error);
@@ -254,6 +267,7 @@ export default function SettingsPage() {
     try {
       localStorage.setItem('businessCategories', JSON.stringify(categories));
       localStorage.setItem('businessCategoryGroups', JSON.stringify(categoryGroups));
+      localStorage.setItem('apiKeys', JSON.stringify(apiKeys));
       setLastSavedCategoryGroups(categoryGroups);
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -1167,6 +1181,11 @@ export default function SettingsPage() {
                     </label>
                     <input
                       type="text"
+                      value={apiKeys.hunter}
+                      onChange={(e) => {
+                        setApiKeys(prev => ({ ...prev, hunter: e.target.value }));
+                        setHasUnsavedChanges(true);
+                      }}
                       className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                       placeholder="Enter your Hunter.io API key"
                     />
@@ -1178,6 +1197,11 @@ export default function SettingsPage() {
                     </label>
                     <input
                       type="text"
+                      value={apiKeys.snov}
+                      onChange={(e) => {
+                        setApiKeys(prev => ({ ...prev, snov: e.target.value }));
+                        setHasUnsavedChanges(true);
+                      }}
                       className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                       placeholder="Enter your Snov.io API key"
                     />
@@ -1189,6 +1213,11 @@ export default function SettingsPage() {
                     </label>
                     <input
                       type="text"
+                      value={apiKeys.instantly}
+                      onChange={(e) => {
+                        setApiKeys(prev => ({ ...prev, instantly: e.target.value }));
+                        setHasUnsavedChanges(true);
+                      }}
                       className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                       placeholder="Enter your Instantly API key"
                     />
@@ -1200,6 +1229,11 @@ export default function SettingsPage() {
                     </label>
                     <input
                       type="text"
+                      value={apiKeys.googleMaps}
+                      onChange={(e) => {
+                        setApiKeys(prev => ({ ...prev, googleMaps: e.target.value }));
+                        setHasUnsavedChanges(true);
+                      }}
                       className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                       placeholder="Enter your Google Maps API key"
                     />

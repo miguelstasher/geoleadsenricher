@@ -331,7 +331,10 @@ const SearchHistoryPage = () => {
   });
 
   // Get unique creators for filter dropdown
-  const uniqueCreators = Array.from(new Set(searchHistory.map(item => item.created_by).filter(Boolean)));
+  const uniqueCreators = Array.from(new Set(searchHistory.map(item => item.created_by).filter(Boolean))).filter(creator => {
+    // Filter out UUID-like strings and empty names
+    return creator && creator.trim() !== '' && !creator.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  });
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

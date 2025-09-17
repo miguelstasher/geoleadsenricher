@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { enrichLeadsBatch, enrichLeadsFast } from '../../../utils/emailEnrichment';
+import { enrichLeadsBatch } from '../../../utils/emailEnrichment';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,12 +19,11 @@ const enrichmentJobs = new Map<string, {
   error?: string;
   startTime: number;
   estimatedCompletionTime?: number;
-  speedMode?: 'normal' | 'fast' | 'ultra';
 }>();
 
 export async function POST(request: NextRequest) {
   try {
-    const { leadIds, speedMode = 'normal' } = await request.json();
+    const { leadIds } = await request.json();
 
     if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
       return NextResponse.json({ error: 'Lead IDs are required' }, { status: 400 });
@@ -52,25 +51,11 @@ export async function POST(request: NextRequest) {
       !lead.email || lead.email.trim() === '' || lead.email === 'Not Found' || lead.email === 'not_found'
     );
 
-    console.log(`🎯 Enrichment job ${jobId}: ${leads.length} selected leads, ${leadsToEnrich.length} need enrichment (Speed: ${speedMode})`);
+    console.log(`🎯 Enrichment job ${jobId}: ${leads.length} selected leads, ${leadsToEnrich.length} need enrichment`);
 
-    // Calculate estimated time based on speed mode
-    let estimatedTimePerLead = 5000; // Default 5 seconds
-    let concurrency = 1; // Default sequential processing
-    
-    switch (speedMode) {
-      case 'fast':
-        estimatedTimePerLead = 2000; // 2 seconds per lead
-        concurrency = 3; // Process 3 leads in parallel
-        break;
-      case 'ultra':
-        estimatedTimePerLead = 1000; // 1 second per lead
-        concurrency = 5; // Process 5 leads in parallel
-        break;
-      default:
-        estimatedTimePerLead = 5000; // 5 seconds per lead
-        concurrency = 1; // Sequential processing
-    }
+    // Ultra-fast time estimation
+    const estimatedTimePerLead = 500; // 0.5 seconds per lead (ultra-fast)
+    const concurrency = 15; // Process 15 leads in parallel
 
     // Initialize job status
     enrichmentJobs.set(jobId, {
@@ -81,12 +66,11 @@ export async function POST(request: NextRequest) {
         currentLead: leadsToEnrich.length > 0 ? leadsToEnrich[0].name : 'None'
       },
       startTime: Date.now(),
-      estimatedCompletionTime: Date.now() + (leadsToEnrich.length * estimatedTimePerLead),
-      speedMode
+      estimatedCompletionTime: Date.now() + (leadsToEnrich.length * estimatedTimePerLead / concurrency)
     });
 
     // Start background processing (don't await this)
-    processEnrichmentJob(jobId, leadsToEnrich, speedMode, concurrency).catch(error => {
+    processEnrichmentJob(jobId, leadsToEnrich).catch(error => {
       console.error(`❌ Enrichment job ${jobId} failed:`, error);
       const job = enrichmentJobs.get(jobId);
       if (job) {
@@ -98,11 +82,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       jobId,
-      message: `Enrichment started for ${leadsToEnrich.length} leads (Speed: ${speedMode})`,
+      message: `Ultra-fast enrichment started for ${leadsToEnrich.length} leads`,
       leadsToEnrich: leadsToEnrich.length,
       leadsSkipped: leads.length - leadsToEnrich.length,
-      speedMode,
-      estimatedTimeMinutes: Math.ceil(leadsToEnrich.length * estimatedTimePerLead / 60000)
+      estimatedTimeMinutes: Math.ceil(leadsToEnrich.length * estimatedTimePerLead / concurrency / 60000)
     });
 
   } catch (error: any) {
@@ -111,28 +94,18 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Background processing function with speed options
-async function processEnrichmentJob(jobId: string, leads: any[], speedMode: string, concurrency: number) {
+// Background processing function with ultra-fast speed
+async function processEnrichmentJob(jobId: string, leads: any[]) {
   const job = enrichmentJobs.get(jobId);
   if (!job) return;
 
   try {
-    console.log(`🚀 Starting background enrichment job ${jobId} for ${leads.length} leads (Speed: ${speedMode}, Concurrency: ${concurrency})`);
+    console.log(`🚀 Starting ultra-fast enrichment job ${jobId} for ${leads.length} leads`);
 
-    let results;
-    
-    // Choose enrichment function based on speed mode
-    if (speedMode === 'ultra') {
-      // Use ultra-fast parallel processing
-      results = await enrichLeadsFast(leads, (progress) => {
-        updateJobProgress(jobId, progress);
-      });
-    } else {
-      // Use batch processing with configurable concurrency
-      results = await enrichLeadsBatch(leads, (progress) => {
-        updateJobProgress(jobId, progress);
-      }, concurrency);
-    }
+    // Process leads with ultra-fast batch processing
+    const results = await enrichLeadsBatch(leads, (progress) => {
+      updateJobProgress(jobId, progress);
+    });
 
     // Check if job was cancelled during processing
     const finalJob = enrichmentJobs.get(jobId);
@@ -194,7 +167,7 @@ async function processEnrichmentJob(jobId: string, leads: any[], speedMode: stri
       finalJob.progress.currentLead = 'Completed';
     }
 
-    console.log(`✅ Enrichment job ${jobId} completed successfully (Speed: ${speedMode})`);
+    console.log(`✅ Ultra-fast enrichment job ${jobId} completed successfully`);
 
   } catch (error: any) {
     console.error(`❌ Enrichment job ${jobId} failed:`, error);

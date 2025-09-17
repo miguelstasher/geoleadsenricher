@@ -66,14 +66,32 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Monitor search completion
   useEffect(() => {
-    const checkForCompletedSearches = async () => {
+    let retryCount = 0;
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 second
+
+    const checkForCompletedSearches = async (isRetry = false) => {
       try {
+        // Check if environment variables are available
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseAnonKey) {
+          console.warn('Supabase environment variables not available for notification provider');
+          return;
+        }
+
+        // Validate URL format
+        try {
+          new URL(supabaseUrl);
+        } catch (urlError) {
+          console.error('Invalid Supabase URL format:', supabaseUrl);
+          return;
+        }
+
         // Import supabase dynamically to avoid SSR issues
         const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
         // Get searches that are completed - look at all completed searches and filter by notification status
         const { data, error } = await supabase
@@ -85,7 +103,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
         if (error) {
           console.error('Error checking for completed searches:', error);
-          console.error('Error details:', JSON.stringify(error, null, 2));
+          // Only log detailed error info in development
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error details:', JSON.stringify(error, null, 2));
+          }
           return;
         }
 
@@ -132,7 +153,26 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       } catch (error) {
         console.error('Error monitoring search completion:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
+        
+        // Only log detailed error info in development to avoid console spam
+        if (process.env.NODE_ENV === 'development' && error instanceof Error) {
+          console.error('Error message:', error.message);
+          console.error('Error stack:', error.stack);
+        }
+
+        // Implement retry logic for network errors
+        if (retryCount < maxRetries && !isRetry) {
+          retryCount++;
+          const delay = baseDelay * Math.pow(2, retryCount - 1); // Exponential backoff
+          console.log(`Retrying search completion check in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+          
+          setTimeout(() => {
+            checkForCompletedSearches(true);
+          }, delay);
+        } else if (retryCount >= maxRetries) {
+          console.warn('Max retries reached for search completion check. Will retry on next interval.');
+          retryCount = 0; // Reset for next interval
+        }
       }
     };
 

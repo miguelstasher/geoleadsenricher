@@ -98,43 +98,35 @@ export async function fetchPlacesFromTextSearch(googleMapsUrl: string): Promise<
   return places;
 }
 
-// City search implementation using 9-directional strategy
+// City search implementation - now focused only on the specific city
 export async function performCitySearch(
   searchParams: CitySearchParams,
   progressCallback?: (current: number, total: number, message: string) => void
 ): Promise<GooglePlace[]> {
   const { city, country, categories } = searchParams;
   
-  // Define the 9 directional search areas
-  const searchDirections = [
-    { name: 'center', location: `Center of ${city}` },
-    { name: 'north', location: `North of ${city}` },
-    { name: 'south', location: `South of ${city}` },
-    { name: 'east', location: `East of ${city}` },
-    { name: 'west', location: `West of ${city}` },
-    { name: 'northEast', location: `North East of ${city}` },
-    { name: 'southEast', location: `South East of ${city}` },
-    { name: 'northWest', location: `North West of ${city}` },
-    { name: 'southWest', location: `South West of ${city}` }
+  // Only search within the specific city, not surrounding areas
+  const searchAreas = [
+    { name: 'city', location: `${city}` }
   ];
 
   let allPlaces: GooglePlace[] = [];
   let currentStep = 0;
-  const totalSteps = searchDirections.length + 1; // +1 for aggregation step
+  const totalSteps = searchAreas.length + 1; // +1 for aggregation step
 
-  // Step 1-9: Search each direction
-  for (const direction of searchDirections) {
+  // Step 1: Search within the city only
+  for (const area of searchAreas) {
     currentStep++;
-    progressCallback?.(currentStep, totalSteps, `Fetching ${direction.name} point places`);
+    progressCallback?.(currentStep, totalSteps, `Fetching ${area.name} places`);
     
-    console.log(`\n=== Searching ${direction.name.toUpperCase()} of ${city} ===`);
+    console.log(`\n=== Searching within ${area.name.toUpperCase()} of ${city} ===`);
     
-    // Search all categories for this direction
+    // Search all categories for this area
     for (const category of categories) {
-      const searchQuery = `${category} in ${direction.location}, ${country}`;
+      const searchQuery = `${category} in ${area.location}, ${country}`;
       const googleMapsUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(searchQuery)}&key=${GOOGLE_API_KEY}`;
       
-      console.log(`Fetching places for category "${category}" in ${direction.location}`);
+      console.log(`Fetching places for category "${category}" in ${area.location}`);
       console.log(`Search URL: ${googleMapsUrl}`);
       
       try {
@@ -148,7 +140,7 @@ export async function performCitySearch(
         // Small delay between API calls to avoid rate limiting
         await sleep(500);
       } catch (error) {
-        console.error(`Error searching ${category} in ${direction.location}:`, error);
+        console.error(`Error searching ${category} in ${area.location}:`, error);
         // Continue with next category even if one fails
       }
     }
@@ -282,6 +274,26 @@ export function formatPlaceForDatabase(details: PlaceDetails, businessType: stri
   const country = details.address_components.find(component => 
     component.types.includes('country')
   )?.long_name || '';
+
+  // Additional city validation - check if the place is actually in the target city
+  const targetCity = additionalData?.targetCity;
+  if (targetCity && city) {
+    const targetCityLower = targetCity.toLowerCase();
+    const cityLower = city.toLowerCase();
+    
+    // More flexible matching - check if either city contains the other
+    const isMatch = cityLower.includes(targetCityLower) || 
+                   targetCityLower.includes(cityLower) ||
+                   // Handle common variations
+                   (targetCityLower === 'seville' && cityLower === 'sevilla') ||
+                   (targetCityLower === 'sevilla' && cityLower === 'seville');
+    
+    if (!isMatch) {
+      // Skip places that are not in the target city
+      console.log(`Skipping place "${details.name}" - located in "${city}" but target city is "${targetCity}"`);
+      return null;
+    }
+  }
 
   const currentTime = new Date().toLocaleString('en-GB', {
     timeZone: 'Europe/London',

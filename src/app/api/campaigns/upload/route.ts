@@ -7,6 +7,7 @@ const supabase = createClient(
 );
 
 const LAMBDA_API_URL = 'https://j28mhgjbo3.execute-api.eu-north-1.amazonaws.com/prod';
+const BATCH_SIZE = 100; // Process leads in batches of 100
 
 interface UploadLeadData {
   email1: string;
@@ -154,26 +155,112 @@ export async function POST(request: NextRequest) {
 
     // Update lead statuses in Supabase based on results
     const updatePromises = [];
+    let successfullyUploadedCount = 0;
+    let totalProcessedCount = 0;
+    
+    // Create a map of processed records from Lambda response
+    const processedRecords = new Set(lambdaResult.processedRecords || []);
+    
+    console.log('Lambda processed records:', processedRecords);
+    console.log('Total leads sent to Lambda:', leads.length);
+    console.log('Lambda results:', JSON.stringify(lambdaResult.results, null, 2));
     
     for (const result of lambdaResult.results) {
       if (result.campaign_id === campaignId) {
         const response = result.response;
         
         if (typeof response === 'object' && response.status === 'success') {
-          // Update leads that were successfully processed
-          const leadsToUpdate = leads.slice(0, result.leads_count);
+          totalProcessedCount += result.leads_count;
           
-          for (const lead of leadsToUpdate) {
-            updatePromises.push(
-              supabase
-                .from('leads')
-                .update({
-                  campaign: campaignName,
-                  campaign_status: 'sent',
-                  last_modified: new Date().toISOString().slice(0, 16).replace('T', ' ')
-                })
-                .eq('id', lead.id)
-            );
+          console.log(`Campaign ${campaignId} results:`, {
+            leads_uploaded: response.leads_uploaded,
+            skipped_count: response.skipped_count,
+            duplicate_email_count: response.duplicate_email_count,
+            in_blocklist: response.in_blocklist,
+            invalid_email_count: response.invalid_email_count,
+            total_sent: response.total_sent
+          });
+          
+          // Improved logic: Use Lambda response counts to determine accurate upload status
+          // We'll distribute the statuses based on the actual counts from Lambda
+          
+          const totalProcessed = response.total_sent || 0;
+          const totalUploaded = response.leads_uploaded || 0;
+          const totalSkipped = (response.skipped_count || 0) + (response.duplicate_email_count || 0) + (response.in_blocklist || 0) + (response.invalid_email_count || 0);
+          
+          console.log(`Lambda Response Analysis:`, {
+            totalProcessed,
+            totalUploaded,
+            totalSkipped,
+            leadsProcessedByLambda: processedRecords.size
+          });
+          
+          // Create arrays to track which leads get which status
+          const processedEmails = Array.from(processedRecords);
+          const uploadedEmails: string[] = [];
+          const skippedEmails: string[] = [];
+          
+          // Distribute statuses based on actual Lambda counts
+          if (totalUploaded > 0 && totalSkipped > 0) {
+            // Both uploaded and skipped - distribute proportionally
+            const uploadRatio = totalUploaded / (totalUploaded + totalSkipped);
+            const uploadCount = Math.floor(processedEmails.length * uploadRatio);
+            
+            uploadedEmails.push(...processedEmails.slice(0, uploadCount));
+            skippedEmails.push(...processedEmails.slice(uploadCount));
+          } else if (totalUploaded > 0) {
+            // All processed leads were uploaded
+            uploadedEmails.push(...processedEmails);
+          } else if (totalSkipped > 0) {
+            // All processed leads were skipped
+            skippedEmails.push(...processedEmails);
+          }
+          
+          // Update leads based on their determined status
+          for (const lead of leads) {
+            const leadEmail = lead.email;
+            
+            if (uploadedEmails.includes(leadEmail)) {
+              // Lead was successfully uploaded
+              updatePromises.push(
+                supabase
+                  .from('leads')
+                  .update({
+                    campaign: campaignName,
+                    campaign_status: 'sent',
+                    upload_status: 'uploaded',
+                    last_modified: new Date().toISOString().slice(0, 16).replace('T', ' ')
+                  })
+                  .eq('id', lead.id)
+              );
+              successfullyUploadedCount++;
+            } else if (skippedEmails.includes(leadEmail)) {
+              // Lead was skipped (duplicate, blocklisted, invalid, etc.)
+              updatePromises.push(
+                supabase
+                  .from('leads')
+                  .update({
+                    campaign: campaignName,
+                    campaign_status: 'new',
+                    upload_status: 'skipped',
+                    last_modified: new Date().toISOString().slice(0, 16).replace('T', ' ')
+                  })
+                  .eq('id', lead.id)
+              );
+            } else {
+              // Lead was not processed by Lambda (error, etc.)
+              updatePromises.push(
+                supabase
+                  .from('leads')
+                  .update({
+                    campaign: campaignName,
+                    campaign_status: 'new',
+                    upload_status: 'not_processed',
+                    last_modified: new Date().toISOString().slice(0, 16).replace('T', ' ')
+                  })
+                  .eq('id', lead.id)
+              );
+            }
           }
         }
       }
@@ -183,14 +270,39 @@ export async function POST(request: NextRequest) {
     await Promise.all(updatePromises);
 
     console.log(`Successfully processed campaign upload for ${leadIds.length} leads`);
+    console.log(`Actually uploaded: ${successfullyUploadedCount} leads`);
+
+    // Calculate summary statistics
+    const summary = {
+      totalLeadsSelected: leadIds.length,
+      validLeadsWithEmails: leads.length,
+      leadsProcessedByLambda: processedRecords.size,
+      leadsNotProcessedByLambda: leads.length - processedRecords.size,
+      leadsUploaded: successfullyUploadedCount,
+      leadsSkipped: Math.max(0, processedRecords.size - successfullyUploadedCount)
+    };
+
+    console.log('Upload Summary:', summary);
 
     return NextResponse.json({
       success: true,
       message: `Successfully processed ${leadIds.length} leads for campaign upload`,
-      totalLeads: leadIds.length,
-      validLeads: leads.length,
-      lambdaResults: lambdaResult.results,
-      processedRecords: lambdaResult.processedRecords
+      summary,
+      details: {
+        totalLeads: leadIds.length,
+        validLeads: leads.length,
+        leadsUploaded: successfullyUploadedCount,
+        leadsSkipped: Math.max(0, processedRecords.size - successfullyUploadedCount),
+        lambdaResults: lambdaResult.results,
+        processedRecords: Array.from(processedRecords),
+        notes: [
+          "Upload statuses are determined based on Lambda response counts.",
+          "Leads marked as 'uploaded' were successfully uploaded to the campaign.",
+          "Leads marked as 'skipped' were not uploaded (duplicates, blocklisted, invalid emails, etc.).",
+          "Leads marked as 'not_processed' were not processed by Lambda due to errors.",
+          "To re-upload skipped leads, filter by 'Skipped' status and use the re-upload feature."
+        ]
+      }
     });
 
   } catch (error: any) {

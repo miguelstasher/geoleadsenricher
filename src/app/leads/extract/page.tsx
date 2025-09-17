@@ -6,6 +6,7 @@ import CustomFilter from '../../components/CustomFilter';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { useNotifications } from '../../components/SimpleNotificationProvider';
+import JobProgress from '../../components/JobProgress';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -80,6 +81,7 @@ export default function ExtractLeadsPage() {
   const [selectedGroup, setSelectedGroup] = useState('');
   const [groups, setGroups] = useState<{ name: string; categories: string[] }[]>([]);
   const [showProcessingMessage, setShowProcessingMessage] = useState(false);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   
   // Add state for business categories
   const [businessCategories, setBusinessCategories] = useState<string[]>([
@@ -227,6 +229,13 @@ export default function ExtractLeadsPage() {
 
       const result = await response.json();
       console.log('Scraping started:', result);
+      
+      // Set the job ID for progress tracking
+      if (result.jobId) {
+        setCurrentJobId(result.jobId);
+      }
+      
+      return result;
     } catch (error) {
       console.error('Error triggering scraping:', error);
       // Update the search status to failed
@@ -237,6 +246,7 @@ export default function ExtractLeadsPage() {
           error_message: 'Failed to start scraping process'
         })
         .eq('id', searchId);
+      throw error;
     }
   };
 
@@ -261,30 +271,38 @@ export default function ExtractLeadsPage() {
     // Show processing message
     setShowProcessingMessage(true);
 
-    // Save search to history first
-    const savedSearch = await saveSearchToHistory();
-    
-    if (savedSearch) {
-      // Show notification that search started
-      addNotification({
-        title: 'Search Started!',
-        message: `Your ${searchMethod === 'city' ? `${city}, ${country}` : 'coordinates'} search is now processing. You'll be notified when it's complete.`,
-        type: 'info'
-      });
-    
-      // Trigger the actual scraping process
-      await triggerScraping(savedSearch.id);
-    } else {
-      // Show error notification if search couldn't be saved
+    try {
+      // Save search to history first
+      const savedSearch = await saveSearchToHistory();
+      
+      if (savedSearch) {
+        // Show notification that search started
+        addNotification({
+          title: 'Search Started!',
+          message: `Your ${searchMethod === 'city' ? `${city}, ${country}` : 'coordinates'} search is now processing in the background. You can continue using the platform while it runs.`,
+          type: 'info'
+        });
+      
+        // Trigger the actual scraping process
+        await triggerScraping(savedSearch.id);
+      } else {
+        // Show error notification if search couldn't be saved
+        addNotification({
+          title: 'Search Failed',
+          message: 'Unable to start the search. Please try again.',
+          type: 'error'
+        });
+        setShowProcessingMessage(false);
+      }
+    } catch (error) {
+      console.error('Error starting search:', error);
       addNotification({
         title: 'Search Failed',
-        message: 'Unable to start the search. Please try again.',
+        message: 'Failed to start the search process. Please try again.',
         type: 'error'
       });
+      setShowProcessingMessage(false);
     }
-
-    // Note: We no longer show fake results here
-    // The user will see the progress in the search history
   };
 
   // Load business categories from localStorage if available
@@ -450,10 +468,30 @@ export default function ExtractLeadsPage() {
           </Link>
         </div>
       </div>
-      {showProcessingMessage ? (
-        <div className="flex flex-col items-center justify-center bg-blue-50 border border-blue-200 rounded-lg p-8 mt-12 shadow-md">
-          <div className="text-xl font-semibold text-blue-800 mb-4">Your scraping is being processed, it can take some minutes.</div>
-          <div className="flex gap-4 mt-4">
+      {showProcessingMessage && currentJobId ? (
+        <div className="space-y-6">
+          <JobProgress 
+            jobId={currentJobId}
+            onComplete={(result) => {
+              addNotification({
+                title: 'Search Completed!',
+                message: `Successfully processed ${result.processedPlaces} places from your search.`,
+                type: 'success'
+              });
+              setShowProcessingMessage(false);
+              setCurrentJobId(null);
+            }}
+            onError={(error) => {
+              addNotification({
+                title: 'Search Failed',
+                message: `The search failed: ${error}`,
+                type: 'error'
+              });
+              setShowProcessingMessage(false);
+              setCurrentJobId(null);
+            }}
+          />
+          <div className="flex gap-4 justify-center">
             <button
               className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
               onClick={() => router.push('/leads')}
@@ -467,6 +505,11 @@ export default function ExtractLeadsPage() {
               Go to Search History
             </button>
           </div>
+        </div>
+      ) : showProcessingMessage ? (
+        <div className="flex flex-col items-center justify-center bg-blue-50 border border-blue-200 rounded-lg p-8 mt-12 shadow-md">
+          <div className="text-xl font-semibold text-blue-800 mb-4">Starting your search...</div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       ) : !showResults ? (
         <div className="bg-white p-6 rounded-lg shadow">

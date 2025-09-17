@@ -206,6 +206,9 @@ export default function Home() {
     facebookUrls: 0,
     emailAddresses: 0,
     waitingForEnrichment: 0,
+    // Website & Enrichment Stats
+    leadsWithoutWebsite: 0,
+    leadsWithoutWebsiteButWithPhone: 0,
     // Email Status Breakdown
     validEmails: 0,
     invalidEmails: 0,
@@ -245,18 +248,11 @@ export default function Home() {
     ).length;
     
     // Waiting for enrichment: leads that haven't been enriched with email yet
-    const waitingForEnrichment = leads.filter(lead => {
-      const hasNoEmail = !lead.email || lead.email.trim() === '';
-      const hasNotFoundEmail = lead.email === 'Not Found' || lead.email === 'not_found';
-      const hasUnverifiedStatus = lead.emailStatus?.toLowerCase() === 'unverified';
-      const isAlreadyProcessed = lead.emailStatus?.toLowerCase() === 'verified' || 
-                                 lead.emailStatus?.toLowerCase() === 'valid' ||
-                                 lead.emailStatus?.toLowerCase() === 'invalid' || 
-                                 lead.emailStatus?.toLowerCase() === 'bounced';
-      
-      // Count leads that need email enrichment: no email, not found, or unverified, but not already processed
-      return (hasNoEmail || hasNotFoundEmail || hasUnverifiedStatus) && !isAlreadyProcessed;
-    }).length;
+    const waitingForEnrichment = leads.filter(lead => 
+      lead.emailStatus?.toLowerCase() === 'unverified' ||
+      (lead.email && lead.email.trim() !== '' && lead.email !== 'Not Found' && lead.email !== 'not_found' && 
+       (!lead.emailStatus || lead.emailStatus.trim() === ''))
+    ).length;
     
     // Email Status Breakdown
     const validEmails = leads.filter(lead => 
@@ -279,6 +275,17 @@ export default function Home() {
       lead.emailStatus?.toLowerCase() === 'unverified' ||
       (lead.email && lead.email.trim() !== '' && lead.email !== 'Not Found' && lead.email !== 'not_found' && 
        (!lead.emailStatus || lead.emailStatus.trim() === ''))
+    ).length;
+    
+    // Count leads without websites (cannot be enriched)
+    const leadsWithoutWebsite = leads.filter(lead => 
+      !lead.website || lead.website.trim() === ''
+    ).length;
+    
+    // Count leads without websites but with phone numbers (good for cold calling)
+    const leadsWithoutWebsiteButWithPhone = leads.filter(lead => 
+      (!lead.website || lead.website.trim() === '') && 
+      (lead.phone && lead.phone.trim() !== '')
     ).length;
     
     // Count by different categories using dynamic chain detection (same as leads page)
@@ -306,6 +313,8 @@ export default function Home() {
       facebookUrls,
       emailAddresses,
       waitingForEnrichment,
+      leadsWithoutWebsite,
+      leadsWithoutWebsiteButWithPhone,
       validEmails,
       invalidEmails,
       notFoundEmails,
@@ -503,6 +512,25 @@ export default function Home() {
             value={stats.waitingForEnrichment.toString()} 
             icon="⏳"
           />
+        </div>
+      </div>
+
+      {/* New metric for leads without websites */}
+      <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-orange-500">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-gray-700">Cannot Be Enriched</h3>
+          <div className="bg-orange-50 p-2 rounded-full">
+            <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+        </div>
+        <div className="text-3xl font-bold text-orange-500 mb-2">{stats.leadsWithoutWebsite}</div>
+        <div className="text-sm text-gray-500 mb-3">
+          {stats.totalLeads > 0 ? Math.round((stats.leadsWithoutWebsite / stats.totalLeads) * 100) : 0}% of all leads lack websites
+        </div>
+        <div className="text-sm text-gray-600">
+          <span className="font-medium text-blue-600">{stats.leadsWithoutWebsiteButWithPhone}</span> have phone numbers for cold calling
         </div>
       </div>
 
