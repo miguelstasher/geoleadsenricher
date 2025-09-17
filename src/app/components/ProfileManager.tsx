@@ -153,23 +153,46 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
       setUploading(true);
       const supabase = createSupabaseClient();
       
-      // Create a local URL for immediate preview
-      const imageUrl = URL.createObjectURL(file);
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Upload file to Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/profile.${fileExt}`;
       
-      // Update the profile with the new image locally
-      setProfile(prev => prev ? { ...prev, photo_url: imageUrl } : null);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('profile-photos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true // Replace existing file
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get the public URL for the uploaded image
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-photos')
+        .getPublicUrl(fileName);
+
+      console.log('Photo uploaded to:', publicUrl);
       
-      // Also update the user metadata in Supabase to persist the photo
-      const { error } = await supabase.auth.updateUser({
+      // Update the profile with the new image
+      setProfile(prev => prev ? { ...prev, photo_url: publicUrl } : null);
+      
+      // Update the user metadata in Supabase to persist the photo URL
+      const { error: updateError } = await supabase.auth.updateUser({
         data: {
-          avatar_url: imageUrl,
-          photo_url: imageUrl
+          avatar_url: publicUrl,
+          photo_url: publicUrl
         }
       });
 
-      if (error) {
-        console.error('Error updating user avatar:', error);
-        showMessage('Photo uploaded but may not persist across sessions', true);
+      if (updateError) {
+        console.error('Error updating user avatar:', updateError);
+        showMessage('Photo uploaded but metadata update failed', false);
       } else {
         showMessage('Photo updated successfully!', true);
         // Refresh user data so the Navigation component shows the new photo
@@ -335,7 +358,8 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
                   }`}>
                     {user?.profile?.role === 'admin' ? '👑 Administrator' : 
                      user?.profile?.role === 'standard' ? '👤 Standard User' : 
-                     '👁️ Reader'}
+                     '👁️ Reader'} 
+                    {/* Debug: {user?.profile?.role || 'no role'} */}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
@@ -344,6 +368,10 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
                     : user?.profile?.role === 'standard'
                     ? 'Access to leads, campaigns, and basic features'
                     : 'Read-only access to view data'}
+                </p>
+                {/* Debug info */}
+                <p className="text-xs text-gray-400 mt-1">
+                  Debug: Role = {user?.profile?.role || 'undefined'}, Bio = {user?.profile?.bio || 'empty'}
                 </p>
               </div>
             </div>
