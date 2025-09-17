@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { NotificationProvider } from './components/SimpleNotificationProvider';
 import ConditionalNavigation from './components/ConditionalNavigation';
+import AuthWrapper from './components/AuthWrapper';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,9 +28,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <NotificationProvider>
-          <ConditionalNavigation>
-            {children}
-          </ConditionalNavigation>
+          <AuthWrapper>
+            <ConditionalNavigation>
+              {children}
+            </ConditionalNavigation>
+          </AuthWrapper>
         </NotificationProvider>
       </body>
     </html>
