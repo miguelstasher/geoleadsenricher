@@ -49,27 +49,22 @@ export async function POST(request: NextRequest) {
       searchId,
       searchData
     };
-    // Send to enhanced AWS Lambda (handles all processing with no timeout limits!)
-    const AWS_LAMBDA_URL = 'https://7sd6o8pk79.execute-api.eu-north-1.amazonaws.com/Working/EmailBusinessScraper';
+    // Send to Supabase Edge Function (no timeout limits!)
+    const SUPABASE_FUNCTION_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/google-maps-extraction`;
     
-    const lambdaPayload = {
-      jobType: jobType,
+    const functionPayload = {
       searchId: searchId,
-      searchData: searchData,
-      supabaseConfig: {
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      }
+      searchData: searchData
     };
 
-    // AWS Lambda processes everything - Google Maps extraction, progress updates, database saves
-    const jobResponse = await fetch(AWS_LAMBDA_URL, {
+    // Fire and forget - Supabase Edge Function handles everything with no timeout limits
+    const jobResponse = await fetch(SUPABASE_FUNCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.AWS_LAMBDA_AUTH_TOKEN || 'b24be261-f07b-4adf-a33c-cf87084b889b'}`
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
       },
-      body: JSON.stringify(lambdaPayload)
+      body: JSON.stringify(functionPayload)
     });
 
     if (!jobResponse.ok) {

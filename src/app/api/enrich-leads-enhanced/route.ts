@@ -10,23 +10,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lead IDs are required' }, { status: 400 });
     }
 
-    // Send to AWS Lambda for email enrichment (Hunter.io → Snov.io → Facebook scraping)
-    const lambdaPayload = {
-      jobType: 'email_enrichment',
-      leadIds: leadIds,
-      supabaseConfig: {
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      }
+    // Send to Supabase Edge Function for email enrichment (Hunter.io → Snov.io → AWS Lambda waterfall)
+    const SUPABASE_FUNCTION_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/email-enrichment`;
+    
+    const functionPayload = {
+      leadIds: leadIds
     };
 
-    const response = await fetch(AWS_LAMBDA_URL, {
+    const response = await fetch(SUPABASE_FUNCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.AWS_LAMBDA_AUTH_TOKEN || 'b24be261-f07b-4adf-a33c-cf87084b889b'}`
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
       },
-      body: JSON.stringify(lambdaPayload)
+      body: JSON.stringify(functionPayload)
     });
 
     if (!response.ok) {
