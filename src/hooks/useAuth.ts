@@ -11,8 +11,9 @@ export interface AuthUser extends User {
     last_name: string
     email: string
     photo_url?: string
-    role?: 'admin' | 'user'
+    role?: 'admin' | 'standard' | 'reader'
     created_at: string
+    bio?: string
   }
 }
 
@@ -65,9 +66,10 @@ export function useAuth() {
           first_name: authUser.user_metadata?.first_name || 'User',
           last_name: authUser.user_metadata?.last_name || '',
           email: authUser.email || '',
-          photo_url: authUser.user_metadata?.avatar_url,
-          role: authUser.user_metadata?.role || 'user',
-          created_at: authUser.created_at
+          photo_url: authUser.user_metadata?.avatar_url || authUser.user_metadata?.photo_url,
+          role: authUser.user_metadata?.role || 'standard',
+          created_at: authUser.created_at,
+          bio: authUser.user_metadata?.bio || ''
         }
       }
 
@@ -93,7 +95,7 @@ export function useAuth() {
         data: {
           first_name: firstName,
           last_name: lastName,
-          role: 'user' // New users are 'user' role by default
+          role: 'standard' // New self-registrations are 'standard' by default
         }
       }
     })

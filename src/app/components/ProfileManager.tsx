@@ -52,13 +52,13 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
           last_name: user.profile.last_name,
           email: user.profile.email,
           photo_url: user.profile.photo_url,
-          bio: ''
+          bio: user.profile.bio || ''
         });
         setFormData({
           first_name: user.profile.first_name || '',
           last_name: user.profile.last_name || '',
           email: user.profile.email || '',
-          bio: ''
+          bio: user.profile.bio || ''
         });
       } else {
         // Fallback to demo data if no user
@@ -317,6 +317,31 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Tell us a little about yourself..."
               />
+              
+              {/* User Role Display */}
+              <div className="mt-3 p-3 bg-gray-50 rounded-md border">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">Account Type:</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    user?.profile?.role === 'admin' 
+                      ? 'bg-red-100 text-red-800 border border-red-200' 
+                      : user?.profile?.role === 'standard'
+                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                      : 'bg-gray-100 text-gray-800 border border-gray-200'
+                  }`}>
+                    {user?.profile?.role === 'admin' ? '👑 Administrator' : 
+                     user?.profile?.role === 'standard' ? '👤 Standard User' : 
+                     '👁️ Reader'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {user?.profile?.role === 'admin' 
+                    ? 'Full access to all features and user management'
+                    : user?.profile?.role === 'standard'
+                    ? 'Access to leads, campaigns, and basic features'
+                    : 'Read-only access to view data'}
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end pt-4">

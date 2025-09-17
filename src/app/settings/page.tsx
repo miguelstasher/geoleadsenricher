@@ -106,7 +106,7 @@ export default function SettingsPage() {
   const [users, setUsers] = useState<{id: string, name: string, email: string, role: string}[]>([]);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState('viewer');
+  const [newUserRole, setNewUserRole] = useState('standard');
   const [editingUser, setEditingUser] = useState<{index: number, user: {id: string, name: string, email: string, role: string}} | null>(null);
   const [userSavedSuccess, setUserSavedSuccess] = useState(false);
 
@@ -186,6 +186,50 @@ export default function SettingsPage() {
     setTimeout(() => {
       setShowNotification(false);
     }, 3000);
+  };
+
+  // User invitation system
+  const addUser = async () => {
+    if (!newUserName || !newUserEmail) {
+      showSaveNotification('Please fill in all fields');
+      return;
+    }
+
+    try {
+      // For now, add to local state - in a real system you'd send invitation email
+      const newUser = {
+        id: Date.now().toString(),
+        name: newUserName,
+        email: newUserEmail,
+        role: newUserRole
+      };
+
+      setUsers(prev => [...prev, newUser]);
+      
+      // Clear form
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserRole('standard');
+      
+      showSaveNotification(`Invitation sent to ${newUserEmail}! (Demo: User added locally)`);
+    } catch (error) {
+      console.error('Error adding user:', error);
+      showSaveNotification('Error adding user');
+    }
+  };
+
+  // Function to remove user
+  const removeUser = (userId: string) => {
+    setUsers(prev => prev.filter(user => user.id !== userId));
+    showSaveNotification('User removed successfully');
+  };
+
+  // Function to update user role
+  const updateUserRole = async (userId: string, newRole: string) => {
+    setUsers(prev => prev.map(user => 
+      user.id === userId ? { ...user, role: newRole } : user
+    ));
+    showSaveNotification('User role updated successfully');
   };
 
   // Load saved chain entries and categories from localStorage on component mount
@@ -1088,9 +1132,9 @@ export default function SettingsPage() {
                       onChange={(e) => setNewUserRole(e.target.value)}
                       className="border rounded-md px-3 py-2"
                     >
+                      <option value="standard">Standard</option>
+                      <option value="reader">Reader</option>
                       <option value="admin">Admin</option>
-                      <option value="sales">Sales</option>
-                      <option value="viewer">Viewer</option>
                     </select>
                   </div>
                   <button
@@ -1155,17 +1199,19 @@ export default function SettingsPage() {
                                 })}
                                 className="border rounded-md px-2 py-1"
                               >
-                                <option value="admin">Admin</option>
-                                <option value="sales">Sales</option>
-                                <option value="viewer">Viewer</option>
+                                <option value="admin">👑 Admin</option>
+                                <option value="standard">👤 Standard</option>
+                                <option value="reader">👁️ Reader</option>
                               </select>
                             ) : (
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                                user.role === 'sales' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800'
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                user.role === 'admin' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                user.role === 'standard' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                'bg-gray-100 text-gray-800 border border-gray-200'
                               }`}>
-                                {user.role}
+                                {user.role === 'admin' ? '👑 Administrator' :
+                                 user.role === 'standard' ? '👤 Standard User' :
+                                 '👁️ Reader'}
                               </span>
                             )}
                           </td>
@@ -1194,8 +1240,9 @@ export default function SettingsPage() {
                                   Edit
                                 </button>
                                 <button
-                                  onClick={() => removeUser(index)}
+                                  onClick={() => removeUser(user.id)}
                                   className="text-red-600 hover:text-red-900"
+                                  disabled={user.email === 'miguel@stasher.com'} // Prevent admin self-deletion
                                 >
                                   Remove
                                 </button>
