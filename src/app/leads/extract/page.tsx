@@ -321,32 +321,112 @@ export default function ExtractLeadsPage() {
     }
   }, []);
 
-  // Automatically fetch current user on component mount
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const response = await fetch('/api/users');
-        if (response.ok) {
-          const users = await response.json();
-          if (users.length > 0) {
-            // Use the first user (Miguel) and format for backward compatibility
-            const user = users[0];
-            setCurrentUser({
-              id: user.id,
-              name: `${user.first_name} ${user.last_name}`,
-              first_name: user.first_name,
-              last_name: user.last_name,
-              email: user.email
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching current user:', error);
-      }
-    };
+  // Handle search/extraction process
+  const handleSearch = async () => {
+    if (!user?.profile) {
+      addNotification({
+        title: 'Authentication Error',
+        message: 'Please log in to start extraction',
+        type: 'error'
+      });
+      return;
+    }
 
-    fetchCurrentUser();
-  }, []);
+    // Validate form
+    if (searchMethod === 'city') {
+      if (!city.trim() || !country.trim()) {
+        setFormError('Please fill in all required fields');
+        return;
+      }
+    } else if (searchMethod === 'coordinates') {
+      if (!coordinates.trim() || !city.trim()) {
+        setFormError('Please fill in coordinates and city');
+        return;
+      }
+    }
+
+    if (selectedCategories.length === 0 && !otherCategories.trim()) {
+      setFormError('Please select at least one business category');
+      return;
+    }
+
+    setFormError('');
+    setIsSearching(true);
+
+    try {
+      // Get user_profiles ID for the authenticated user
+      const { data: userProfile, error: userError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('email', user.profile.email)
+        .single();
+
+      if (userError) {
+        console.error('Error getting user profile:', userError);
+        throw new Error('Failed to get user profile');
+      }
+
+      // Prepare search parameters
+      const searchParams = {
+        searchMethod,
+        city: city.trim(),
+        country: country.trim(),
+        coordinates: coordinates.trim(),
+        radius,
+        categories: [...selectedCategories, ...otherCategories.split(',').map(cat => cat.trim()).filter(Boolean)],
+        currency,
+        created_by: userProfile.id, // Use the user_profiles ID
+        record_owner: userProfile.id // Set ownership to current user
+      };
+
+      console.log('Starting extraction with params:', searchParams);
+
+      // Call the extraction API
+      const response = await fetch('/api/scrape-google-maps', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(searchParams),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        addNotification({
+          title: 'Extraction Started',
+          message: `Started extracting leads for ${city}. Check the leads page for results.`,
+          type: 'success'
+        });
+        
+        // Redirect to leads page to see results
+        router.push('/leads');
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || 'Extraction failed');
+      }
+    } catch (error) {
+      console.error('Extraction error:', error);
+      addNotification({
+        title: 'Extraction Failed',
+        message: error instanceof Error ? error.message : 'Failed to start extraction',
+        type: 'error'
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle form reset
+  const handleReset = () => {
+    setCity('');
+    setCountry('');
+    setCoordinates('');
+    setRadius(500);
+    setSelectedCategories([]);
+    setOtherCategories('');
+    setCurrency('');
+    setFormError('');
+  };
 
   useEffect(() => {
     // Load groups from localStorage
@@ -768,6 +848,13 @@ export default function ExtractLeadsPage() {
             </div>
           </div>
           
+          {/* Form Error Display */}
+          {formError && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md">
+              {formError}
+            </div>
+          )}
+          
           <div className="mt-6 flex justify-end">
             <button
               type="button"
@@ -779,9 +866,17 @@ export default function ExtractLeadsPage() {
             <button
               type="button"
               onClick={handleSearch}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              disabled={isSearching}
+              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Start Search
+              {isSearching ? (
+                <div className="flex items-center">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Extracting...
+                </div>
+              ) : (
+                'Start Search'
+              )}
             </button>
           </div>
         </div>
