@@ -92,7 +92,8 @@ export function useAuth() {
       options: {
         data: {
           first_name: firstName,
-          last_name: lastName
+          last_name: lastName,
+          role: 'user' // New users are 'user' role by default
         }
       }
     })

@@ -110,6 +110,9 @@ export default function SettingsPage() {
   const [editingUser, setEditingUser] = useState<{index: number, user: {id: string, name: string, email: string, role: string}} | null>(null);
   const [userSavedSuccess, setUserSavedSuccess] = useState(false);
 
+  // Check if current user is admin
+  const isAdmin = user?.profile?.role === 'admin';
+
   // Load authenticated user into users list
   useEffect(() => {
     if (user?.profile) {
@@ -117,7 +120,7 @@ export default function SettingsPage() {
         id: user.id,
         name: `${user.profile.first_name} ${user.profile.last_name}`,
         email: user.profile.email,
-        role: user.profile.role || 'admin'
+        role: user.profile.role || 'user'
       }]);
     }
   }, [user]);
@@ -621,26 +624,31 @@ export default function SettingsPage() {
               >
                 Chain Management
               </button>
-              <button
-                onClick={() => handleSectionChange('users')}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
-                  activeSection === 'users'
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Users Management
-              </button>
-              <button
-                onClick={() => handleSectionChange('api')}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
-                  activeSection === 'api'
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                API Settings
-              </button>
+              {/* Admin-only sections */}
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={() => handleSectionChange('users')}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                      activeSection === 'users'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Users Management
+                  </button>
+                  <button
+                    onClick={() => handleSectionChange('api')}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                      activeSection === 'api'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    API Settings
+                  </button>
+                </>
+              )}
             </nav>
             
             {/* Logout Button */}
@@ -1052,8 +1060,8 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* Users Section */}
-            {activeSection === 'users' && (
+            {/* Users Section - Admin Only */}
+            {activeSection === 'users' && isAdmin && (
               <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-xl font-semibold mb-4">Users Management</h2>
                 
@@ -1202,8 +1210,8 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* API Settings Section */}
-            {activeSection === 'api' && (
+            {/* API Settings Section - Admin Only */}
+            {activeSection === 'api' && isAdmin && (
               <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-xl font-semibold mb-4">API Integration Settings</h2>
                 <p className="text-gray-600 mb-6">
