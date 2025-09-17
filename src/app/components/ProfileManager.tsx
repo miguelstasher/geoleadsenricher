@@ -18,7 +18,7 @@ interface ProfileManagerProps {
 }
 
 export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -113,6 +113,9 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
         };
         setProfile(updatedProfile);
       }
+
+      // Refresh user data in the auth context so Navigation updates
+      await refreshUser();
     } catch (error) {
       console.error('Error saving profile:', error);
       showMessage('Error saving profile', false);
@@ -144,13 +147,30 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
 
     try {
       setUploading(true);
+      const supabase = createSupabaseClient();
       
-      // For now, create a local URL for the uploaded image
+      // Create a local URL for immediate preview
       const imageUrl = URL.createObjectURL(file);
       
-      // Update the profile with the new image
+      // Update the profile with the new image locally
       setProfile(prev => prev ? { ...prev, photo_url: imageUrl } : null);
-      showMessage('Photo updated successfully!', true);
+      
+      // Also update the user metadata in Supabase to persist the photo
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          avatar_url: imageUrl,
+          photo_url: imageUrl
+        }
+      });
+
+      if (error) {
+        console.error('Error updating user avatar:', error);
+        showMessage('Photo uploaded but may not persist across sessions', true);
+      } else {
+        showMessage('Photo updated successfully!', true);
+        // Refresh user data so the Navigation component shows the new photo
+        await refreshUser();
+      }
       
     } catch (error) {
       console.error('Error uploading photo:', error);

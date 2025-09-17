@@ -109,12 +109,20 @@ export function useAuth() {
     return { error }
   }
 
+  const refreshUser = async () => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (currentUser) {
+      await fetchUserProfile(currentUser)
+    }
+  }
+
   return {
     user,
     session,
     loading,
     signIn,
     signUp,
-    signOut
+    signOut,
+    refreshUser
   }
 }
