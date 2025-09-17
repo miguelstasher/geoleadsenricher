@@ -57,19 +57,10 @@ export function useAuth() {
 
   const fetchUserProfile = async (authUser: User) => {
     try {
-      const { data: profile, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching user profile:', error)
-      }
-
+      // For now, just create a simple user profile without database lookup
       const userWithProfile: AuthUser = {
         ...authUser,
-        profile: profile || {
+        profile: {
           id: authUser.id,
           first_name: authUser.user_metadata?.first_name || 'User',
           last_name: authUser.user_metadata?.last_name || '',
