@@ -45,6 +45,7 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
       
       if (user?.profile) {
         // Use the authenticated user's profile data
+        console.log('Loading user profile data:', user.profile);
         setActualUserId(user.id);
         setProfile({
           id: user.id,
@@ -60,6 +61,7 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
           email: user.profile.email || '',
           bio: user.profile.bio || ''
         });
+        console.log('Form data set with bio:', user.profile.bio);
       } else {
         // Fallback to demo data if no user
         setFormData({
@@ -115,7 +117,9 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
       }
 
       // Refresh user data in the auth context so Navigation updates
+      console.log('Refreshing user data after profile save...');
       await refreshUser();
+      console.log('User data refreshed');
     } catch (error) {
       console.error('Error saving profile:', error);
       showMessage('Error saving profile', false);
