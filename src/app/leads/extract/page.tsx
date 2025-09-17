@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { useNotifications } from '../../components/SimpleNotificationProvider';
 import JobProgress from '../../components/JobProgress';
+import { useAuth } from '@/hooks/useAuth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -65,6 +66,7 @@ const sampleResults = [
 export default function ExtractLeadsPage() {
   const router = useRouter();
   const { addNotification } = useNotifications();
+  const { user } = useAuth();
   const [searchMethod, setSearchMethod] = useState('city');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [otherCategories, setOtherCategories] = useState('');
@@ -76,7 +78,6 @@ export default function ExtractLeadsPage() {
   const [coordinates, setCoordinates] = useState('');
   const [radius, setRadius] = useState(500);
   const [currency, setCurrency] = useState('');
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [formError, setFormError] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('');
   const [groups, setGroups] = useState<{ name: string; categories: string[] }[]>([]);
@@ -753,12 +754,12 @@ export default function ExtractLeadsPage() {
                 Created by
               </label>
               <div className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 bg-gray-50 sm:text-sm rounded-md">
-                {currentUser ? (
+                {user?.profile ? (
                   <div className="flex items-center space-x-2">
                     <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-medium">
-                      {currentUser.first_name?.[0]}{currentUser.last_name?.[0]}
+                      {user.profile.first_name?.[0]}{user.profile.last_name?.[0]}
                     </div>
-                    <span>{currentUser.name}</span>
+                    <span>{user.profile.first_name} {user.profile.last_name}</span>
                   </div>
                 ) : (
                   <span className="text-gray-500">Loading user...</span>
