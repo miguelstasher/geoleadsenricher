@@ -21,12 +21,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <NotificationProvider>
-          <AuthWrapper>
-            <Navigation />
-            <main className="container mx-auto p-4">
-              {children}
-            </main>
-          </AuthWrapper>
+          <Navigation />
+          <main className="container mx-auto p-4">
+            {children}
+          </main>
         </NotificationProvider>
       </body>
     </html>
