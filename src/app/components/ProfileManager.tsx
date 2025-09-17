@@ -90,7 +90,9 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
       const supabase = createSupabaseClient();
       
       // Update user metadata in Supabase Auth
-      const { error } = await supabase.auth.updateUser({
+      console.log('Saving bio to Supabase:', formData.bio);
+      
+      const { data, error } = await supabase.auth.updateUser({
         data: {
           first_name: formData.first_name,
           last_name: formData.last_name,
@@ -98,7 +100,10 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
         }
       });
 
+      console.log('Supabase update result:', { data, error });
+
       if (error) {
+        console.error('Supabase update error:', error);
         throw error;
       }
 
@@ -114,12 +119,12 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
           bio: formData.bio
         };
         setProfile(updatedProfile);
+        console.log('Local profile updated:', updatedProfile);
       }
 
-      // Refresh user data in the auth context so Navigation updates
-      console.log('Refreshing user data after profile save...');
-      await refreshUser();
-      console.log('User data refreshed');
+      // Force a page reload to get fresh user data
+      console.log('Forcing page reload to refresh user data...');
+      window.location.reload();
     } catch (error) {
       console.error('Error saving profile:', error);
       showMessage('Error saving profile', false);
@@ -346,7 +351,7 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
               />
               
               {/* User Role Display */}
-              <div className="mt-3 p-3 bg-gray-50 rounded-md border">
+              <div className="mt-3 p-3 bg-red-50 rounded-md border border-red-200">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-700">Account Type:</span>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
