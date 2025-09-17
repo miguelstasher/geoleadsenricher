@@ -294,7 +294,7 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
 
         {/* Profile Information Section */}
         <div className="md:col-span-2">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">🔥 TESTING DEPLOYMENT - Personal Information 🔥</h3>
           
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
