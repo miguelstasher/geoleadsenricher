@@ -14,25 +14,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Campaign ID and name are required' }, { status: 400 });
     }
 
-    // Send to AWS Lambda for campaign upload (no timeout limits!)
-    const lambdaPayload = {
-      jobType: 'campaign_upload',
+    // Send to Supabase Edge Function for campaign upload (no timeout limits!)
+    const SUPABASE_FUNCTION_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/campaign-upload`;
+    
+    const functionPayload = {
       leadIds: leadIds,
       campaignId: campaignId,
-      campaignName: campaignName,
-      supabaseConfig: {
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      }
+      campaignName: campaignName
     };
 
-    const response = await fetch(AWS_LAMBDA_URL, {
+    const response = await fetch(SUPABASE_FUNCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.AWS_LAMBDA_AUTH_TOKEN || 'b24be261-f07b-4adf-a33c-cf87084b889b'}`
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
       },
-      body: JSON.stringify(lambdaPayload)
+      body: JSON.stringify(functionPayload)
     });
 
     if (!response.ok) {

@@ -14,24 +14,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Platform must be linkedin or facebook' }, { status: 400 });
     }
 
-    // Send to AWS Lambda for social media URL enrichment
-    const lambdaPayload = {
-      jobType: 'social_enrichment',
+    // Send to Supabase Edge Function for social media URL enrichment
+    const SUPABASE_FUNCTION_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/social-media-enrichment`;
+    
+    const functionPayload = {
       leadIds: leadIds,
-      platform: platform,
-      supabaseConfig: {
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      }
+      platform: platform
     };
 
-    const response = await fetch(AWS_LAMBDA_URL, {
+    const response = await fetch(SUPABASE_FUNCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.AWS_LAMBDA_AUTH_TOKEN || 'b24be261-f07b-4adf-a33c-cf87084b889b'}`
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
       },
-      body: JSON.stringify(lambdaPayload)
+      body: JSON.stringify(functionPayload)
     });
 
     if (!response.ok) {
