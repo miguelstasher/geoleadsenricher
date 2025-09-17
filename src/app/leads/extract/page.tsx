@@ -163,7 +163,7 @@ export default function ExtractLeadsPage() {
         other_categories: otherCategories || null,
         selected_group: selectedGroup || null,
         currency: currency,
-        created_by: currentUser?.id || null, // Use currentUser.id for database
+        created_by: user?.profile?.email || null, // Use authenticated user email
         total_results: 0, // Will be updated during processing
         results: null, // Will be populated when completed
         status: 'pending' as const
@@ -201,7 +201,7 @@ export default function ExtractLeadsPage() {
         query: searchMethod === 'city' ? `${city}, ${country}` : coordinates,
         categories: selectedCategories,
         otherCategories,
-        createdBy: currentUser?.name || null, // Use currentUser.name for localStorage
+        createdBy: user?.profile ? `${user.profile.first_name} ${user.profile.last_name}` : null, // Use authenticated user name
       };
 
       const existing = JSON.parse(localStorage.getItem('searchHistory') || '[]');
@@ -264,8 +264,13 @@ export default function ExtractLeadsPage() {
       return;
     }
     
-    if (!currency || !currentUser) {
-      alert('Please fill in Currency. User information is loading...');
+    if (!currency) {
+      setFormError('Please select a currency.');
+      return;
+    }
+    
+    if (!user?.profile) {
+      setFormError('Please log in to start extraction.');
       return;
     }
 
@@ -321,112 +326,6 @@ export default function ExtractLeadsPage() {
     }
   }, []);
 
-  // Handle search/extraction process
-  const handleSearch = async () => {
-    if (!user?.profile) {
-      addNotification({
-        title: 'Authentication Error',
-        message: 'Please log in to start extraction',
-        type: 'error'
-      });
-      return;
-    }
-
-    // Validate form
-    if (searchMethod === 'city') {
-      if (!city.trim() || !country.trim()) {
-        setFormError('Please fill in all required fields');
-        return;
-      }
-    } else if (searchMethod === 'coordinates') {
-      if (!coordinates.trim() || !city.trim()) {
-        setFormError('Please fill in coordinates and city');
-        return;
-      }
-    }
-
-    if (selectedCategories.length === 0 && !otherCategories.trim()) {
-      setFormError('Please select at least one business category');
-      return;
-    }
-
-    setFormError('');
-    setIsSearching(true);
-
-    try {
-      // Get user_profiles ID for the authenticated user
-      const { data: userProfile, error: userError } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('email', user.profile.email)
-        .single();
-
-      if (userError) {
-        console.error('Error getting user profile:', userError);
-        throw new Error('Failed to get user profile');
-      }
-
-      // Prepare search parameters
-      const searchParams = {
-        searchMethod,
-        city: city.trim(),
-        country: country.trim(),
-        coordinates: coordinates.trim(),
-        radius,
-        categories: [...selectedCategories, ...otherCategories.split(',').map(cat => cat.trim()).filter(Boolean)],
-        currency,
-        created_by: userProfile.id, // Use the user_profiles ID
-        record_owner: userProfile.id // Set ownership to current user
-      };
-
-      console.log('Starting extraction with params:', searchParams);
-
-      // Call the extraction API
-      const response = await fetch('/api/scrape-google-maps', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(searchParams),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        addNotification({
-          title: 'Extraction Started',
-          message: `Started extracting leads for ${city}. Check the leads page for results.`,
-          type: 'success'
-        });
-        
-        // Redirect to leads page to see results
-        router.push('/leads');
-      } else {
-        const error = await response.json();
-        throw new Error(error.message || 'Extraction failed');
-      }
-    } catch (error) {
-      console.error('Extraction error:', error);
-      addNotification({
-        title: 'Extraction Failed',
-        message: error instanceof Error ? error.message : 'Failed to start extraction',
-        type: 'error'
-      });
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  // Handle form reset
-  const handleReset = () => {
-    setCity('');
-    setCountry('');
-    setCoordinates('');
-    setRadius(500);
-    setSelectedCategories([]);
-    setOtherCategories('');
-    setCurrency('');
-    setFormError('');
-  };
 
   useEffect(() => {
     // Load groups from localStorage
