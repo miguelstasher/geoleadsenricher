@@ -45,7 +45,6 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
       
       if (user?.profile) {
         // Use the authenticated user's profile data
-        console.log('Loading user profile data:', user.profile);
         setActualUserId(user.id);
         setProfile({
           id: user.id,
@@ -61,7 +60,6 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
           email: user.profile.email || '',
           bio: user.profile.bio || ''
         });
-        console.log('Form data set with bio:', user.profile.bio);
       } else {
         // Fallback to demo data if no user
         setFormData({
@@ -90,8 +88,6 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
       const supabase = createSupabaseClient();
       
       // Update user metadata in Supabase Auth
-      console.log('Saving bio to Supabase:', formData.bio);
-      
       const { data, error } = await supabase.auth.updateUser({
         data: {
           first_name: formData.first_name,
@@ -100,10 +96,7 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
         }
       });
 
-      console.log('Supabase update result:', { data, error });
-
       if (error) {
-        console.error('Supabase update error:', error);
         throw error;
       }
 
@@ -119,12 +112,10 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
           bio: formData.bio
         };
         setProfile(updatedProfile);
-        console.log('Local profile updated:', updatedProfile);
       }
 
-      // Force a page reload to get fresh user data
-      console.log('Forcing page reload to refresh user data...');
-      window.location.reload();
+      // Refresh user data
+      await refreshUser();
     } catch (error) {
       console.error('Error saving profile:', error);
       showMessage('Error saving profile', false);
@@ -182,7 +173,6 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
         .from('profile-photos')
         .getPublicUrl(fileName);
 
-      console.log('Photo uploaded to:', publicUrl);
       
       // Update the profile with the new image
       setProfile(prev => prev ? { ...prev, photo_url: publicUrl } : null);
@@ -294,7 +284,7 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
 
         {/* Profile Information Section */}
         <div className="md:col-span-2">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">🔥 TESTING DEPLOYMENT - Personal Information 🔥</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
           
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -373,10 +363,6 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
                     : user?.profile?.role === 'standard'
                     ? 'Access to leads, campaigns, and basic features'
                     : 'Read-only access to view data'}
-                </p>
-                {/* Debug info */}
-                <p className="text-xs text-gray-400 mt-1">
-                  Debug: Role = {user?.profile?.role || 'undefined'}, Bio = {user?.profile?.bio || 'empty'}
                 </p>
               </div>
             </div>
