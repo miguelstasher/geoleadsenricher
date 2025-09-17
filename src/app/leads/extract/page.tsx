@@ -83,6 +83,11 @@ export default function ExtractLeadsPage() {
   const [groups, setGroups] = useState<{ name: string; categories: string[] }[]>([]);
   const [showProcessingMessage, setShowProcessingMessage] = useState(false);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [searchProgress, setSearchProgress] = useState<{
+    progress: number;
+    message: string;
+    status: string;
+  } | null>(null);
   
   // Add state for business categories
   const [businessCategories, setBusinessCategories] = useState<string[]>([
@@ -231,9 +236,10 @@ export default function ExtractLeadsPage() {
       const result = await response.json();
       console.log('Scraping started:', result);
       
-      // Set the job ID for progress tracking
-      if (result.jobId) {
-        setCurrentJobId(result.jobId);
+      // Start progress tracking for this search
+      if (savedSearch && savedSearch.id) {
+        setCurrentJobId(savedSearch.id);
+        startProgressTracking(savedSearch.id);
       }
       
       return result;
@@ -309,6 +315,45 @@ export default function ExtractLeadsPage() {
       });
       setShowProcessingMessage(false);
     }
+  };
+
+  // Progress tracking function
+  const startProgressTracking = (searchId: string) => {
+    const trackProgress = async () => {
+      try {
+        const response = await fetch(`/api/progress/${searchId}`);
+        if (response.ok) {
+          const progressData = await response.json();
+          setSearchProgress({
+            progress: progressData.progress,
+            message: progressData.message,
+            status: progressData.status
+          });
+
+          // If completed, stop tracking and redirect
+          if (progressData.status === 'completed') {
+            setShowProcessingMessage(false);
+            addNotification({
+              title: 'Extraction Completed!',
+              message: `Successfully extracted ${progressData.total_results} leads`,
+              type: 'success'
+            });
+            router.push('/leads');
+            return;
+          }
+
+          // If still processing, continue tracking
+          if (progressData.status === 'in_process' || progressData.status === 'pending') {
+            setTimeout(trackProgress, 3000); // Check every 3 seconds
+          }
+        }
+      } catch (error) {
+        console.error('Error tracking progress:', error);
+        setTimeout(trackProgress, 5000); // Retry in 5 seconds
+      }
+    };
+
+    trackProgress();
   };
 
   // Load business categories from localStorage if available

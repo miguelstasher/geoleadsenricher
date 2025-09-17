@@ -49,17 +49,27 @@ export async function POST(request: NextRequest) {
       searchId,
       searchData
     };
+    // Send to enhanced AWS Lambda (handles all processing with no timeout limits!)
+    const AWS_LAMBDA_URL = 'https://7sd6o8pk79.execute-api.eu-north-1.amazonaws.com/Working/EmailBusinessScraper';
+    
+    const lambdaPayload = {
+      jobType: jobType,
+      searchId: searchId,
+      searchData: searchData,
+      supabaseConfig: {
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      }
+    };
 
-    // Create job via the jobs API
-    const jobResponse = await fetch(`${request.nextUrl.origin}/api/jobs`, {
+    // AWS Lambda processes everything - Google Maps extraction, progress updates, database saves
+    const jobResponse = await fetch(AWS_LAMBDA_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.AWS_LAMBDA_AUTH_TOKEN || 'b24be261-f07b-4adf-a33c-cf87084b889b'}`
       },
-      body: JSON.stringify({
-        type: jobType,
-        params: jobParams
-      })
+      body: JSON.stringify(lambdaPayload)
     });
 
     if (!jobResponse.ok) {

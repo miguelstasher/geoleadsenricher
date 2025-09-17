@@ -1,0 +1,19 @@
+{
+  "crons": [
+    {
+      "path": "/api/jobs/processor",
+      "schedule": "* * * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/jobs/processor/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/scrape-google-maps/route.ts": {
+      "maxDuration": 10
+    },
+    "src/app/api/enrich-leads/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}
