@@ -15,7 +15,7 @@ type CategoryGroup = {
 };
 
 export default function SettingsPage() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const router = useRouter();
   
   // Logout handler
@@ -102,17 +102,25 @@ export default function SettingsPage() {
   const [csvUploadSuccess, setCsvUploadSuccess] = useState(false);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
   
-  // State for users management
-  const [users, setUsers] = useState<{id: string, name: string, email: string, role: string}[]>([
-    { id: '1', name: 'Admin User', email: 'admin@example.com', role: 'admin' },
-    { id: '2', name: 'Sales User', email: 'sales@example.com', role: 'sales' },
-    { id: '3', name: 'Viewer User', email: 'viewer@example.com', role: 'viewer' }
-  ]);
+  // State for users management - use real authenticated users
+  const [users, setUsers] = useState<{id: string, name: string, email: string, role: string}[]>([]);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState('viewer');
   const [editingUser, setEditingUser] = useState<{index: number, user: {id: string, name: string, email: string, role: string}} | null>(null);
   const [userSavedSuccess, setUserSavedSuccess] = useState(false);
+
+  // Load authenticated user into users list
+  useEffect(() => {
+    if (user?.profile) {
+      setUsers([{
+        id: user.id,
+        name: `${user.profile.first_name} ${user.profile.last_name}`,
+        email: user.profile.email,
+        role: user.profile.role || 'admin'
+      }]);
+    }
+  }, [user]);
 
   // State for profile management
   const [profile, setProfile] = useState({

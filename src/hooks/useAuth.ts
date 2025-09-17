@@ -57,7 +57,7 @@ export function useAuth() {
 
   const fetchUserProfile = async (authUser: User) => {
     try {
-      // For now, just create a simple user profile without database lookup
+      // Use the latest user metadata from Supabase
       const userWithProfile: AuthUser = {
         ...authUser,
         profile: {
@@ -66,7 +66,7 @@ export function useAuth() {
           last_name: authUser.user_metadata?.last_name || '',
           email: authUser.email || '',
           photo_url: authUser.user_metadata?.avatar_url,
-          role: 'user',
+          role: authUser.user_metadata?.role || 'user',
           created_at: authUser.created_at
         }
       }

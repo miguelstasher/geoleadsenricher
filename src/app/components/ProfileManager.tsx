@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { createSupabaseClient } from '@/lib/supabase';
 
 interface UserProfile {
   id: string;
@@ -84,9 +85,21 @@ export default function ProfileManager({ currentUserId }: ProfileManagerProps) {
 
     try {
       setSaving(true);
+      const supabase = createSupabaseClient();
       
-      // For now, just show success message since we're using Supabase Auth
-      // In a full implementation, you would update the user metadata via Supabase
+      // Update user metadata in Supabase Auth
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          bio: formData.bio
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
       showMessage('Profile updated successfully!', true);
       
       // Update local state to reflect changes
