@@ -34,7 +34,22 @@ export default function RecordOwnerDisplay({
 
   useEffect(() => {
     if (users.length > 0) {
-      const user = users.find(u => u.id === ownerId);
+      // Try to find by ID first, then by name
+      let user = users.find(u => u.id === ownerId);
+      if (!user) {
+        // If not found by ID, try to find by name
+        user = users.find(u => `${u.first_name} ${u.last_name}` === ownerId);
+      }
+      if (!user && ownerId) {
+        // If still not found but we have an ownerId, create a temporary user object
+        user = {
+          id: ownerId,
+          first_name: ownerId.split(' ')[0] || ownerId,
+          last_name: ownerId.split(' ')[1] || '',
+          email: ownerId.includes('@') ? ownerId : '',
+          photo_url: undefined
+        };
+      }
       setCurrentUser(user || null);
       setSelectedUserId(ownerId);
     }

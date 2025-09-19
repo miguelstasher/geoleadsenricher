@@ -1,3 +1,6 @@
+// UPDATED EDGE FUNCTION - Copy this to Supabase
+// This fixes the category filtering issue
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -20,6 +23,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     console.log(`🚀 Starting Google Maps extraction for search ${searchId}`)
+    console.log(`📋 Selected categories: ${JSON.stringify(searchData.categories)}`)
 
     // Update search status to processing
     await supabase
@@ -33,6 +37,20 @@ serve(async (req) => {
     const GOOGLE_API_KEY = 'AIzaSyCWLWBJJeNyMsV1ieKMQl53OJuzZLOYP-k'
     let allPlaces: any[] = []
 
+    // Map frontend categories to Google Places API types
+    const categoryMapping: { [key: string]: string[] } = {
+      'Hotel': ['lodging'],
+      'Aparthotel': ['lodging'],
+      'Restaurant': ['restaurant'],
+      'Bar': ['bar'],
+      'Cafe': ['cafe'],
+      'Hospital': ['hospital'],
+      'Pharmacy': ['pharmacy'],
+      'Gym': ['gym'],
+      'Beauty Salon': ['beauty_salon'],
+      'Spa': ['spa']
+    }
+
     if (searchData.search_method === 'coordinates') {
       // Parse coordinates
       const [lat, lng] = searchData.coordinates.split(',').map((coord: string) => parseFloat(coord.trim()))
@@ -45,102 +63,66 @@ serve(async (req) => {
       console.log(`🎯 Using 9-point search strategy with ${searchPoints.length} points`)
       
       let currentSearch = 0
-      const totalSearches = searchPoints.length * searchData.categories.length
+      let totalSearches = 0
+      
+      // Calculate total searches
+      for (const category of searchData.categories) {
+        const googleTypes = categoryMapping[category] || [category.toLowerCase()]
+        totalSearches += searchPoints.length * googleTypes.length
+      }
       
       for (const [pointIndex, point] of searchPoints.entries()) {
         console.log(`📍 Searching point ${pointIndex + 1}/${searchPoints.length}: ${point.lat}, ${point.lng} (radius: ${point.radius}m)`)
         
-        for (const [categoryIndex, category] of searchData.categories.entries()) {
-          currentSearch++
-          const progress = Math.floor((currentSearch / totalSearches) * 70) // 0-70% for searching
+        for (const category of searchData.categories) {
+          const googleTypes = categoryMapping[category] || [category.toLowerCase()]
           
-          // Update progress
-          await supabase
-            .from('search_history')
-            .update({ 
-              processed_count: currentSearch,
-              total_results: totalSearches
-            })
-            .eq('id', searchId)
-          
-          console.log(`🔍 Point ${pointIndex + 1}/${searchPoints.length}, category: ${category} (${progress}%)`)
-          
-          // EXACT Google Places API call (same as localhost)
-          const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${point.lat},${point.lng}&radius=${point.radius}&type=${category.toLowerCase()}&key=${GOOGLE_API_KEY}`
-          
-          try {
-            const response = await fetch(url)
-            const data = await response.json()
+          for (const googleType of googleTypes) {
+            currentSearch++
+            const progress = Math.floor((currentSearch / totalSearches) * 70) // 0-70% for searching
             
-            console.log(`📊 Google API response for ${category} at point ${pointIndex + 1}: Status=${data.status}, Results=${data.results?.length || 0}`)
+            // Update progress
+            await supabase
+              .from('search_history')
+              .update({ 
+                processed_count: currentSearch,
+                total_results: totalSearches
+              })
+              .eq('id', searchId)
             
-            if (data.status === 'OK' && data.results && data.results.length > 0) {
-              // Add category to each place AND filter by category
-              const placesWithCategory = data.results
-                .filter((place: any) => {
-                  // Filter places to match selected category
-                  const placeTypes = place.types || []
-                  return placeTypes.includes(category.toLowerCase()) || 
-                         placeTypes.includes(category.toLowerCase().replace(' ', '_'))
-                })
-                .map((place: any) => ({
+            console.log(`🔍 Point ${pointIndex + 1}/${searchPoints.length}, category: ${category} → ${googleType} (${progress}%)`)
+            
+            // EXACT Google Places API call (same as localhost)
+            const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${point.lat},${point.lng}&radius=${point.radius}&type=${googleType}&key=${GOOGLE_API_KEY}`
+            
+            try {
+              const response = await fetch(url)
+              const data = await response.json()
+              
+              console.log(`📊 Google API response for ${category}(${googleType}) at point ${pointIndex + 1}: Status=${data.status}, Results=${data.results?.length || 0}`)
+              
+              if (data.status === 'OK' && data.results && data.results.length > 0) {
+                // Add the ORIGINAL category (not Google's generic type)
+                const placesWithCategory = data.results.map((place: any) => ({
                   ...place,
-                  category: category,
+                  category: category, // Use original category (Hotel, Aparthotel)
+                  google_type: googleType,
                   search_point: pointIndex + 1
                 }))
+                
+                allPlaces.push(...placesWithCategory)
+                console.log(`✅ Found ${placesWithCategory.length} ${category} places at point ${pointIndex + 1}`)
+              } else {
+                console.log(`⚠️ No results for ${category}(${googleType}) at point ${pointIndex + 1}. Status: ${data.status}`)
+              }
               
-              allPlaces.push(...placesWithCategory)
-              console.log(`✅ Found ${placesWithCategory.length} ${category} places at point ${pointIndex + 1} (filtered from ${data.results.length} total)`)
-            } else {
-              console.log(`⚠️ No results for ${category} at point ${pointIndex + 1}. Status: ${data.status}`)
+              // Rate limiting delay (same as localhost)
+              await new Promise(resolve => setTimeout(resolve, 300))
+              
+            } catch (error) {
+              console.error(`❌ Error searching point ${pointIndex + 1}, category ${category}:`, error)
             }
-            
-            // Rate limiting delay (same as localhost)
-            await new Promise(resolve => setTimeout(resolve, 300))
-            
-          } catch (error) {
-            console.error(`❌ Error searching point ${pointIndex + 1}, category ${category}:`, error)
           }
-        }
-      }
-    } else if (searchData.search_method === 'city') {
-      // City-based search
-      console.log(`🏙️ City search: ${searchData.city}, ${searchData.country}`)
-      
-      for (const [categoryIndex, category] of searchData.categories.entries()) {
-        const progress = Math.floor((categoryIndex / searchData.categories.length) * 70)
-        
-        await supabase
-          .from('search_history')
-          .update({ 
-            processed_count: categoryIndex + 1,
-            total_results: searchData.categories.length
-          })
-          .eq('id', searchId)
-        
-        console.log(`🔍 Searching city for category: ${category} (${progress}%)`)
-        
-        // Use Google Places Text Search for city-based search
-        const query = `${category} in ${searchData.city}, ${searchData.country}`
-        const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${GOOGLE_API_KEY}`
-        
-        try {
-          const response = await fetch(url)
-          const data = await response.json()
-          
-          if (data.results && data.results.length > 0) {
-            const placesWithCategory = data.results.map((place: any) => ({
-              ...place,
-              category: category
-            }))
-            allPlaces.push(...placesWithCategory)
-            console.log(`✅ Found ${data.results.length} places for ${category} in ${searchData.city}`)
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 500))
-          
-        } catch (error) {
-          console.error(`❌ Error searching city for ${category}:`, error)
         }
       }
     }
@@ -184,11 +166,11 @@ serve(async (req) => {
             address: placeDetails.formatted_address || null,
             city: extractCity(placeDetails.address_components) || searchData.city,
             country: extractCountry(placeDetails.address_components),
-            business_type: place.category || 'Business',
+            business_type: place.category, // Use original category (Hotel, Aparthotel)
             poi: place.vicinity || null,
             currency: searchData.currency,
-            created_by: searchData.created_by,
-            record_owner: searchData.created_by,
+            created_by: searchData.created_by, // Oscar T
+            record_owner: searchData.created_by, // Same as created_by = Oscar T
             latitude: placeDetails.geometry?.location?.lat,
             longitude: placeDetails.geometry?.location?.lng,
             email: null,
@@ -198,6 +180,8 @@ serve(async (req) => {
             upload_status: null,
             last_modified: new Date().toISOString()
           }
+
+          console.log(`💾 Saving lead: ${leadData.name} (Category: ${leadData.business_type})`)
 
           // Insert to leads table
           const { error: insertError } = await supabase

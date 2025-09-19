@@ -70,13 +70,24 @@ export async function POST(request: NextRequest) {
 
       if (jobResponse.ok) {
         console.log('✅ Supabase Edge Function started successfully');
+        
+        // Update search status to in_process (Edge Function will complete it)
+        await supabase
+          .from('search_history')
+          .update({ 
+            status: 'in_process',
+            processing_started_at: new Date().toISOString()
+          })
+          .eq('id', searchId);
+        
         return NextResponse.json({ 
           success: true, 
           message: 'Google Maps extraction started successfully',
           searchId: searchId
         });
       } else {
-        console.log('⚠️ Supabase Edge Function failed, falling back to original system');
+        const errorText = await jobResponse.text();
+        console.log('⚠️ Supabase Edge Function failed:', errorText);
       }
     } catch (error) {
       console.log('⚠️ Supabase Edge Function error, falling back to original system:', error);
