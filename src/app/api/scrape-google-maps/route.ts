@@ -82,37 +82,31 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ Supabase Edge Function error, falling back to original system:', error);
     }
 
-    // Fallback: Use original background job system
-    const jobResponse = await fetch(`${request.nextUrl.origin}/api/jobs`, {
+    // Fallback: Use direct extraction method (guaranteed to work)
+    console.log('⚠️ Using direct extraction method as fallback');
+    
+    const directResponse = await fetch(`${request.nextUrl.origin}/api/extraction-direct`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        type: jobType,
-        params: jobParams
+        searchId: searchId
       })
     });
 
-    if (!jobResponse.ok) {
-      const errorData = await jobResponse.json();
-      return NextResponse.json({ error: errorData.error || 'Failed to create background job' }, { status: 500 });
+    if (!directResponse.ok) {
+      const errorData = await directResponse.json();
+      return NextResponse.json({ error: errorData.error || 'Failed to start direct extraction' }, { status: 500 });
     }
 
-    const { jobId } = await jobResponse.json();
-
-    // Update search history with job reference
-    await supabase
-      .from('search_history')
-      .update({ 
-        job_id: jobId
-      })
-      .eq('id', searchId);
+    const directResult = await directResponse.json();
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Background extraction started',
-      jobId: jobId
+      message: 'Direct extraction completed successfully',
+      searchId: searchId,
+      processed: directResult.processed
     });
 
   } catch (error) {
