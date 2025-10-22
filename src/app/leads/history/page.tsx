@@ -269,7 +269,7 @@ const SearchHistoryPage = () => {
     // Auto-refresh every 30 seconds to catch status updates
     const interval = setInterval(() => {
       loadSearchHistory();
-    }, 30000);
+    }, 5000); // Refresh every 5 seconds instead of 30
 
     return () => clearInterval(interval);
   }, []);

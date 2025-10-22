@@ -258,16 +258,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Complete the extraction
-    await supabase
+    // Complete the extraction with detailed status update
+    const { error: completionError } = await supabase
       .from('search_history')
       .update({ 
         status: 'completed',
         total_results: processedCount,
         processed_count: processedCount,
-        results: { summary: `Extracted ${processedCount} leads from ${uniquePlaces.length} places` }
+        results: { summary: `Extracted ${processedCount} leads from ${uniquePlaces.length} places` },
+        completed_at: new Date().toISOString()
       })
       .eq('id', searchId);
+
+    if (completionError) {
+      console.error('❌ Error updating completion status:', completionError);
+    } else {
+      console.log(`✅ Search ${searchId} marked as completed with ${processedCount} results`);
+    }
 
     console.log(`🎉 Extraction completed! Processed ${processedCount} leads`);
 
@@ -280,6 +287,16 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Direct extraction error:', error);
+    
+    // Update search status to failed
+    await supabase
+      .from('search_history')
+      .update({ 
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+        failed_at: new Date().toISOString()
+      })
+      .eq('id', searchId);
     
     return NextResponse.json({
       error: 'Direct extraction failed',

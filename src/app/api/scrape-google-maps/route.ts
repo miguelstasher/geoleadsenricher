@@ -72,13 +72,19 @@ export async function POST(request: NextRequest) {
         console.log('✅ Supabase Edge Function started successfully');
         
         // Update search status to in_process (Edge Function will complete it)
-        await supabase
+        const { error: updateError } = await supabase
           .from('search_history')
           .update({ 
             status: 'in_process',
             processing_started_at: new Date().toISOString()
           })
           .eq('id', searchId);
+        
+        if (updateError) {
+          console.error('❌ Error updating status to in_process:', updateError);
+        } else {
+          console.log('✅ Status updated to in_process');
+        }
         
         return NextResponse.json({ 
           success: true, 
