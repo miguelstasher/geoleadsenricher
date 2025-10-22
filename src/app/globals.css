@@ -17,15 +17,14 @@
 
 /* Force light theme - removed dark mode media query */
 
+/* Remove global overrides to preserve login page design */
 body {
-  background: #ffffff !important;
   color: #171717;
   font-family: Arial, Helvetica, sans-serif;
   min-height: 100vh;
 }
 
 html {
-  background: #ffffff !important;
   min-height: 100vh;
 }
 
@@ -40,12 +39,11 @@ html {
 }
 
 #__next {
-  background: #ffffff !important;
   min-height: 100vh;
 }
 
-/* Override any dark theme styles */
-.dark, [data-theme="dark"] {
+/* Override dark theme styles ONLY on dashboard */
+main .dark, main [data-theme="dark"] {
   background: #ffffff !important;
   color: #171717 !important;
 }
@@ -55,7 +53,6 @@ html, body, #__next {
   width: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
-  background: #ffffff !important;
 }
 
 /* Remove any container constraints */
@@ -64,8 +61,8 @@ html, body, #__next {
   width: 100% !important;
 }
 
-/* Force white background on page elements only */
-html, body, #__next, main {
+/* Force white background ONLY on dashboard pages */
+main .min-h-screen.bg-white {
   background: #ffffff !important;
   background-color: #ffffff !important;
 }
