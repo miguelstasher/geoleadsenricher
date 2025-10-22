@@ -107,10 +107,10 @@ export default function LoginPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          <h2 className="mt-6 text-4xl font-bold text-white">
+          <h2 className="mt-6 text-4xl font-bold text-white drop-shadow-lg" style={{textShadow: '0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.3)'}}>
             Welcome back
           </h2>
-          <p className="mt-2 text-lg text-white">
+          <p className="mt-2 text-lg text-white drop-shadow-md" style={{textShadow: '0 0 15px rgba(255,255,255,0.4), 0 0 30px rgba(255,255,255,0.2)'}}>
             Sign in to your GeoLeads account
           </p>
         </div>
@@ -252,17 +252,18 @@ export default function LoginPage() {
           )}
 
           <div className="text-center">
-            <p className="text-lg text-white">
+            <p className="text-lg text-white drop-shadow-md" style={{textShadow: '0 0 10px rgba(255,255,255,0.4), 0 0 20px rgba(255,255,255,0.2)'}}>
               Don't have an account?{' '}
-              <Link href="/signup" className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2">
+              <Link href="/signup" className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2 drop-shadow-sm" style={{textShadow: '0 0 8px rgba(232,121,249,0.6), 0 0 16px rgba(232,121,249,0.3)'}}>
                 Sign up here
               </Link>
             </p>
-            <p className="mt-2 text-sm text-white">
+            <p className="mt-2 text-sm text-white drop-shadow-md" style={{textShadow: '0 0 10px rgba(255,255,255,0.4), 0 0 20px rgba(255,255,255,0.2)'}}>
               Forgot your password?{' '}
               <button
                 onClick={() => setShowForgotPassword(true)}
-                className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2"
+                className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2 drop-shadow-sm"
+                style={{textShadow: '0 0 8px rgba(232,121,249,0.6), 0 0 16px rgba(232,121,249,0.3)'}}
               >
                 Reset it here
               </button>
