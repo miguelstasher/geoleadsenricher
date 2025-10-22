@@ -72,14 +72,14 @@ export default function RootLayout({
               background: inherit !important;
             }
             
-            /* Force white background on main content area */
-            main {
+            /* Force white background ONLY on dashboard main content area */
+            main .min-h-screen.bg-white {
               background: #ffffff !important;
               background-color: #ffffff !important;
             }
             
-            /* Force white background on the extract page container */
-            .space-y-6 > div {
+            /* Force white background on the extract page container - ONLY dashboard */
+            main .space-y-6 > div {
               background: #ffffff !important;
             }
             
@@ -99,9 +99,9 @@ export default function RootLayout({
               color: #171717 !important;
             }
             
-            /* ULTRA-AGGRESSIVE DASHBOARD FIXES */
+            /* DASHBOARD FIXES - ONLY DASHBOARD */
             /* Force white background on dashboard */
-            .space-y-6, .min-h-screen {
+            main .space-y-6, main .min-h-screen.bg-white {
               background: #ffffff !important;
             }
             
@@ -110,13 +110,13 @@ export default function RootLayout({
               color: #111827 !important;
             }
             
-            /* Fix dashboard statistics text */
-            .text-3xl, .text-2xl, .text-xl, .text-lg {
+            /* Fix dashboard statistics text - ONLY dashboard */
+            main .text-3xl, main .text-2xl, main .text-xl, main .text-lg {
               color: #111827 !important;
             }
             
-            /* Fix dashboard titles */
-            h1, h2, h3, h4, h5, h6 {
+            /* Fix dashboard titles - ONLY dashboard */
+            main h1, main h2, main h3, main h4, main h5, main h6 {
               color: #111827 !important;
             }
             
@@ -135,13 +135,13 @@ export default function RootLayout({
               background-color: #ffffff !important;
             }
             
-            /* Force white on all dashboard containers */
-            .bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100 {
+            /* Force white on dashboard containers ONLY */
+            main .bg-white, main .bg-gray-50, main .bg-gray-100, main .bg-slate-50, main .bg-slate-100 {
               background: #ffffff !important;
             }
             
-            /* Override any remaining dark backgrounds */
-            .bg-gray-900, .bg-gray-800, .bg-black, .bg-slate-900, .bg-slate-800, .bg-zinc-900, .bg-zinc-800 {
+            /* Override dark backgrounds ONLY on dashboard */
+            main .bg-gray-900, main .bg-gray-800, main .bg-black, main .bg-slate-900, main .bg-slate-800, main .bg-zinc-900, main .bg-zinc-800 {
               background: #ffffff !important;
             }
             
