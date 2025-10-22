@@ -11,8 +11,6 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Force light theme - removed dark mode media query */
-
 /* Remove global overrides to preserve login page design */
 body {
   color: #171717;
@@ -24,36 +22,13 @@ html {
   min-height: 100vh;
 }
 
-/* Force white background for entire page */
-* {
-  box-sizing: border-box;
-}
-
-/* Force white background for entire page */
-* {
-  box-sizing: border-box;
-}
-
 #__next {
   min-height: 100vh;
 }
 
-/* Remove global overrides completely */
-
-/* Ensure full width layout */
-html, body, #__next {
-  width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* Remove any container constraints */
-.container {
-  max-width: none !important;
-  width: 100% !important;
-}
-
 /* Remove all global white background overrides */
+
+/* Remove all global overrides */
 
 /* Remove all global overrides */
 
@@ -63,37 +38,11 @@ html, body, #__next {
 label.required::after,
 .required > label::after {
   content: " *";
-  color: #e53e3e;
+  color: #ef4444;
   font-weight: bold;
 }
 
-/* Styles for selected categories */
-.selected-category {
-  display: inline-flex;
-  align-items: center;
-  background-color: #e6f0ff;
-  color: #1a56db;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-right: 5px;
-  margin-bottom: 5px;
-  font-size: 0.75rem;
-}
-
-/* Make placeholder text more visible - AGGRESSIVE STYLING */
-*::placeholder {
-  color: #374151 !important; /* Much darker gray */
-  opacity: 1 !important;
-}
-
-input::placeholder,
-textarea::placeholder,
-select::placeholder {
-  color: #374151 !important; /* Much darker gray */
-  opacity: 1 !important;
-}
-
-/* Force all input text to be dark */
+/* Form input styling */
 input,
 textarea,
 select {
@@ -113,151 +62,6 @@ select::placeholder {
   opacity: 1 !important;
 }
 
-/* Override any Tailwind placeholder classes */
-.placeholder-gray-400::placeholder {
-  color: #374151 !important;
-  opacity: 1 !important;
-}
-
-.placeholder-slate-400::placeholder {
-  color: #374151 !important;
-  opacity: 1 !important;
-}
-
-/* Additional specific overrides for extract page */
-input[placeholder="Enter city name"]::placeholder,
-input[placeholder="Enter city name (e.g. London)"]::placeholder,
-input[placeholder="e.g 500"]::placeholder,
-input[placeholder="In this format: 56.39283, -9.83748"]::placeholder,
-input[placeholder="e.g Hotel, Co-working, Bike Rental"]::placeholder {
-  color: #374151 !important;
-  opacity: 1 !important;
-}
-
-/* ULTRA-AGGRESSIVE placeholder fixes for extract page */
-input[type="text"]::placeholder,
-input[type="number"]::placeholder,
-select::placeholder {
-  color: #374151 !important;
-  opacity: 1 !important;
-}
-
-/* Force all input placeholders to be dark */
-input::placeholder {
-  color: #374151 !important;
-  opacity: 1 !important;
-}
-
-/* Override any Tailwind placeholder classes on extract page */
-.placeholder-gray-400::placeholder,
-.placeholder-slate-400::placeholder,
-.placeholder-gray-300::placeholder,
-.placeholder-slate-300::placeholder {
-  color: #374151 !important;
-  opacity: 1 !important;
-}
-
-/* Target specific classes used in extract page */
-.shadow-sm::placeholder,
-.border-gray-300::placeholder,
-.block::placeholder,
-.w-full::placeholder,
-.sm\\:text-sm::placeholder {
-  color: #374151 !important;
-  opacity: 1 !important;
-}
-
-/* Force all form elements to have dark placeholders */
-form input::placeholder,
-form select::placeholder,
-form textarea::placeholder {
-  color: #374151 !important;
-  opacity: 1 !important;
-}
-
-/* NUCLEAR OPTION - Force ALL placeholders to be dark - CACHE BUST 2024-01-15 */
-*::placeholder {
-  color: #374151 !important;
-  opacity: 1 !important;
-}
-
-/* Force all input and select elements to have dark placeholders */
-input::placeholder,
-select::placeholder,
-textarea::placeholder {
-  color: #374151 !important;
-  opacity: 1 !important;
-}
-
-/* FIX WHITE TEXT ISSUES - BUT PRESERVE NAVIGATION */
-/* Force headings to be dark ONLY on white backgrounds */
-.bg-white h1, .bg-white h2, .bg-white h3, .bg-white h4, .bg-white h5, .bg-white h6,
-main h1, main h2, main h3, main h4, main h5, main h6 {
-  color: #111827 !important;
-}
-
-/* Force text elements to be dark ONLY on white backgrounds */
-.bg-white p, .bg-white span, .bg-white div, .bg-white label, .bg-white li, .bg-white td, .bg-white th,
-main p, main span, main div, main label, main li, main td, main th {
-  color: #111827 !important;
-}
-
-/* Force form labels to be dark ONLY on white backgrounds */
-.bg-white label,
-main label {
-  color: #111827 !important;
-}
-
-/* Force spans to be dark ONLY on white backgrounds */
-.bg-white span,
-main span {
-  color: #111827 !important;
-}
-
-/* Override light text classes ONLY on white backgrounds */
-.bg-white .text-slate-100,
-.bg-white .text-slate-200,
-.bg-white .text-slate-300,
-.bg-white .text-gray-100,
-.bg-white .text-gray-200,
-.bg-white .text-gray-300,
-main .text-slate-100,
-main .text-slate-200,
-main .text-slate-300,
-main .text-gray-100,
-main .text-gray-200,
-main .text-gray-300 {
-  color: #111827 !important;
-}
-
-/* PRESERVE NAVIGATION BAR STYLING - CACHE BUST 2024-01-15 */
-/* Force navigation bar to keep white text */
-nav.bg-gradient-to-r,
-nav.bg-blue-600,
-nav.bg-blue-700,
-.bg-gradient-to-r,
-.bg-blue-600,
-.bg-blue-700 {
-  color: white !important;
-}
-
-nav.bg-gradient-to-r *,
-nav.bg-blue-600 *,
-nav.bg-blue-700 *,
-.bg-gradient-to-r *,
-.bg-blue-600 *,
-.bg-blue-700 * {
-  color: white !important;
-}
-
-/* Force navigation text to stay white */
-nav h1,
-nav span,
-nav a,
-nav div {
-  color: white !important;
-}
-
 /* Fix option text in select dropdowns */
 option {
   color: #111827 !important;
@@ -271,15 +75,13 @@ option {
 /* WHITE BACKGROUNDS = DARK TEXT */
 .bg-white,
 .bg-gray-50,
-.bg-gray-100,
-main {
+.bg-gray-100 {
   color: #111827 !important;
 }
 
 .bg-white *,
 .bg-gray-50 *,
-.bg-gray-100 *,
-main * {
+.bg-gray-100 * {
   color: #111827 !important;
 }
 
@@ -354,10 +156,43 @@ select::placeholder {
   color: #111827 !important;
 }
 
-/* Fix select placeholder text */
+/* Fix select option text */
+option {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+}
+
+/* Fix select placeholder options */
 select option[value=""] {
   color: #6b7280 !important;
 }
 
+/* NOTIFICATION FIXES - Ensure notifications are always visible */
+.fixed.top-4.right-4 {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
 
-/* FORCE DEPLOYMENT - Wed Oct 22 15:09:14 BST 2025 */
+.fixed.top-4.right-4 * {
+  color: #111827 !important;
+}
+
+.bg-red-50 {
+  background-color: #fef2f2 !important;
+  color: #991b1b !important;
+}
+
+.bg-green-50 {
+  background-color: #f0fdf4 !important;
+  color: #166534 !important;
+}
+
+.bg-blue-50 {
+  background-color: #eff6ff !important;
+  color: #1e40af !important;
+}
+
+.bg-yellow-50 {
+  background-color: #fefce8 !important;
+  color: #a16207 !important;
+}

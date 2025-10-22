@@ -30,20 +30,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#ffffff" />
         <meta name="color-scheme" content="light" />
         <meta name="supported-color-schemes" content="light" />
-        <style dangerouslySetInnerHTML={{
-          __html: `
-            /* MINIMAL CSS - ONLY DASHBOARD WHITE BACKGROUND */
-            /* Dashboard page white background */
-            main .min-h-screen.bg-white {
-              background: #ffffff !important;
-            }
-            
-            /* Dashboard text should be dark on white */
-            main .min-h-screen.bg-white * {
-              color: #111827 !important;
-            }
-          `
-        }} />
+        {/* REMOVED GLOBAL CSS - Let each page handle its own styling */}
       </head>
       <body className={`${inter.className} bg-white`}>
         <NotificationProvider>
