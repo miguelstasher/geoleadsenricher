@@ -1,15 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
   --foreground: #171717;
   --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
 }
 
 @theme inline {
-  --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -42,11 +38,7 @@ html {
   min-height: 100vh;
 }
 
-/* Override dark theme styles ONLY on dashboard */
-main .dark, main [data-theme="dark"] {
-  background: #ffffff !important;
-  color: #171717 !important;
-}
+/* Remove global overrides completely */
 
 /* Ensure full width layout */
 html, body, #__next {
@@ -61,23 +53,11 @@ html, body, #__next {
   width: 100% !important;
 }
 
-/* Force white background ONLY on dashboard pages */
-main .min-h-screen.bg-white {
-  background: #ffffff !important;
-  background-color: #ffffff !important;
-}
+/* Remove all global white background overrides */
 
-/* Override any dark backgrounds on page containers */
-.page-container, .dashboard-container {
-  background: #ffffff !important;
-  background-color: #ffffff !important;
-}
+/* Remove all global overrides */
 
-/* Force white on any potential dark elements */
-[class*="dark"], [data-theme="dark"], .dark-mode {
-  background: #ffffff !important;
-  background-color: #ffffff !important;
-}
+/* Remove all global overrides */
 
 /* Required field styles */
 label.required::after,
