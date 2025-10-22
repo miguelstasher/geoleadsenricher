@@ -107,10 +107,10 @@ export default function LoginPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          <h2 className="mt-6 text-4xl font-bold text-white">
+          <h2 className="mt-6 text-4xl font-bold text-white" style={{color: '#ffffff !important'}}>
             Welcome back
           </h2>
-          <p className="mt-2 text-lg text-white">
+          <p className="mt-2 text-lg text-white" style={{color: '#ffffff !important'}}>
             Sign in to your GeoLeads account
           </p>
         </div>
@@ -131,7 +131,7 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-white mb-3">
+              <label htmlFor="email" className="block text-sm font-medium text-white mb-3" style={{color: '#ffffff !important'}}>
                 Email address
               </label>
               <input
@@ -148,7 +148,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-white mb-3">
+              <label htmlFor="password" className="block text-sm font-medium text-white mb-3" style={{color: '#ffffff !important'}}>
                 Password
               </label>
               <div className="relative">
@@ -257,17 +257,18 @@ export default function LoginPage() {
           )}
 
           <div className="text-center">
-            <p className="text-lg text-white">
+            <p className="text-lg text-white" style={{color: '#ffffff !important'}}>
               Don't have an account?{' '}
-              <Link href="/signup" className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2">
+              <Link href="/signup" className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2" style={{color: '#e879f9 !important'}}>
                 Sign up here
               </Link>
             </p>
-            <p className="mt-2 text-sm text-white">
+            <p className="mt-2 text-sm text-white" style={{color: '#ffffff !important'}}>
               Forgot your password?{' '}
               <button
                 onClick={() => setShowForgotPassword(true)}
                 className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2"
+                style={{color: '#e879f9 !important'}}
               >
                 Reset it here
               </button>
