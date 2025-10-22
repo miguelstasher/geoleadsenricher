@@ -380,6 +380,40 @@ const SearchHistoryPage = () => {
     }
   };
 
+  // Fix stuck searches
+  const handleFixStuckSearches = async () => {
+    try {
+      const response = await fetch('/api/fix-stuck-searches', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fix stuck searches');
+      }
+
+      const result = await response.json();
+      
+      addNotification({
+        title: 'Stuck Searches Fixed',
+        message: `Fixed ${result.fixed} stuck searches`,
+        type: 'success'
+      });
+
+      // Reload the search history
+      loadSearchHistory();
+    } catch (error) {
+      console.error('Error fixing stuck searches:', error);
+      addNotification({
+        title: 'Fix Failed',
+        message: 'Failed to fix stuck searches. Please try again.',
+        type: 'error'
+      });
+    }
+  };
+
   // Filter search history based on search term and filters
   const filteredHistory = searchHistory.filter(item => {
     const matchesSearch = searchTerm === '' || 
