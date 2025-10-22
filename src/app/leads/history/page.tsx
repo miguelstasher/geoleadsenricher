@@ -452,9 +452,6 @@ const SearchHistoryPage = () => {
     setShowResults(true);
   };
 
-  const handleDeleteSearch = async (id: string) => {
-    // Remove this function entirely - we don't want to delete search history
-  };
 
   if (loading) {
     return (
@@ -855,9 +852,10 @@ const SearchHistoryPage = () => {
                         </span>
                         {item.status === 'failed' && item.error_message && (
                           <div className="group relative">
-                            <span className="text-red-600 cursor-help text-sm">⚠️</span>
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap max-w-xs">
-                              Error: {item.error_message}
+                            <span className="text-red-600 cursor-help text-sm hover:text-red-800">⚠️</span>
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-red-600 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 whitespace-nowrap max-w-xs border border-red-500">
+                              <div className="font-semibold">Error:</div>
+                              <div>{item.error_message}</div>
                             </div>
                           </div>
                         )}
