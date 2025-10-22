@@ -17,15 +17,16 @@ interface User {
 const UserDisplay = ({ userId }: { userId?: string }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasFetched, setHasFetched] = useState(false);
   const { user: currentUser } = useAuth();
 
   useEffect(() => {
-    if (userId) {
+    if (userId && !hasFetched) {
       fetchUser(userId);
-    } else {
+    } else if (!userId) {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, hasFetched]);
 
   const fetchUser = async (id: string) => {
     try {
@@ -35,6 +36,7 @@ const UserDisplay = ({ userId }: { userId?: string }) => {
         const users = await response.json();
         const foundUser = users.find((u: User) => u.id === id);
         setUser(foundUser || null);
+        setHasFetched(true);
       }
     } catch (error) {
       console.error('Error fetching user:', error);
@@ -266,13 +268,16 @@ const SearchHistoryPage = () => {
   useEffect(() => {
     loadSearchHistory();
     
-    // Auto-refresh every 30 seconds to catch status updates
+    // Auto-refresh every 10 seconds to catch status updates, but only if there are searches in progress
     const interval = setInterval(() => {
-      loadSearchHistory();
-    }, 5000); // Refresh every 5 seconds instead of 30
+      const hasInProgressSearches = searchHistory.some(item => item.status === 'in_process');
+      if (hasInProgressSearches) {
+        loadSearchHistory();
+      }
+    }, 10000); // Refresh every 10 seconds, but only when needed
 
     return () => clearInterval(interval);
-  }, []);
+  }, [searchHistory]);
 
   // Retry failed search
   const handleRetrySearch = async (item: SearchHistoryItem) => {
