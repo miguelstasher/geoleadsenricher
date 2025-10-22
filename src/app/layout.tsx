@@ -34,10 +34,7 @@ export default function RootLayout({
           __html: `
             /* CACHE BUST - FORCE RELOAD - ${Date.now()} */
             /* NUCLEAR WHITE BACKGROUND - DEPLOY NOW - ${Date.now()} */
-            html, body, #__next, main {
-              background: #ffffff !important;
-              background-color: #ffffff !important;
-            }
+            /* Remove global overrides to preserve login page design */
             
             /* TARGETED WHITE BACKGROUND - ONLY DASHBOARD */
             /* Don't override login/signup pages */
@@ -48,30 +45,27 @@ export default function RootLayout({
               background-color: #ffffff !important;
             }
             
-            /* Force white background on ALL page containers */
-            .space-y-6, .min-h-screen, .bg-gray-50, .bg-gray-100 {
+            /* Force white background ONLY on dashboard page containers */
+            main .space-y-6, main .min-h-screen.bg-white, main .bg-gray-50, main .bg-gray-100 {
               background: #ffffff !important;
             }
             
-            /* Override any dark theme classes */
-            .dark, [data-theme="dark"], .bg-gray-900, .bg-gray-800, .bg-black {
+            /* Override dark theme classes ONLY on dashboard */
+            main .dark, main [data-theme="dark"], main .bg-gray-900, main .bg-gray-800, main .bg-black {
               background: #ffffff !important;
             }
             
-            /* Override any dark backgrounds */
-            .bg-gray-900, .bg-gray-800, .bg-black {
+            /* Override dark backgrounds ONLY on dashboard */
+            main .bg-gray-900, main .bg-gray-800, main .bg-black {
               background: #ffffff !important;
             }
             
-            /* Force white background on extract page specifically */
-            .space-y-6 {
+            /* Force white background on extract page specifically - ONLY dashboard */
+            main .space-y-6 {
               background: #ffffff !important;
             }
             
-            /* Force white background on all divs */
-            div {
-              background: #ffffff !important;
-            }
+            /* Remove global div override to preserve login page */
             
             /* Exception for navigation and buttons */
             nav, button, .bg-blue-600, .bg-blue-700, .bg-green-600, .bg-red-600 {
