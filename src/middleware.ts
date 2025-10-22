@@ -75,7 +75,14 @@ export async function middleware(request: NextRequest) {
     '/api/enrich-leads-enhanced',
     '/api/social-enhanced',
     '/api/campaigns/sync',
-    '/api/campaigns/upload-enhanced'
+    '/api/campaigns/upload-enhanced',
+    '/api/test-connection',
+    '/api/test-api',
+    '/api/system-diagnostics',
+    '/api/delete-stuck-searches',
+    '/api/manual-fix-status',
+    '/api/retry-stuck-search',
+    '/api/fix-stuck-searches'
   ]
   
   const isAllowedApiRoute = allowedApiRoutes.some(route => 
