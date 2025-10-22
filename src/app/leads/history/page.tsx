@@ -346,6 +346,40 @@ const SearchHistoryPage = () => {
     }
   };
 
+  // Delete search
+  const handleDeleteSearch = async (item: SearchHistoryItem) => {
+    if (!confirm(`Are you sure you want to delete this search? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('search_history')
+        .delete()
+        .eq('id', item.id);
+
+      if (error) {
+        throw error;
+      }
+
+      addNotification({
+        title: 'Search Deleted',
+        message: `Search for ${item.search_method === 'city' ? `${item.city}, ${item.country}` : 'coordinates'} has been deleted.`,
+        type: 'success'
+      });
+
+      // Reload the search history
+      loadSearchHistory();
+    } catch (error) {
+      console.error('Error deleting search:', error);
+      addNotification({
+        title: 'Delete Failed',
+        message: 'Failed to delete the search. Please try again.',
+        type: 'error'
+      });
+    }
+  };
+
   // Filter search history based on search term and filters
   const filteredHistory = searchHistory.filter(item => {
     const matchesSearch = searchTerm === '' || 
@@ -834,6 +868,14 @@ const SearchHistoryPage = () => {
                             }`}
                           >
                             {retryingSearches.has(item.id) ? 'Retrying...' : 'Search Again'}
+                          </button>
+                        )}
+                        {(item.status === 'failed' || item.status === 'completed') && (
+                          <button
+                            onClick={() => handleDeleteSearch(item)}
+                            className="px-3 py-1 rounded border border-red-600 text-red-600 hover:bg-red-50 hover:text-red-700 text-sm font-medium ml-2"
+                          >
+                            Delete
                           </button>
                         )}
                       </div>

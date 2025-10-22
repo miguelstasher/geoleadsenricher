@@ -138,15 +138,33 @@ export async function POST(request: NextRequest) {
                 }
                 
                 if (filteredResults.length > 0) {
-                  // Add the ORIGINAL category (not Google's generic type)
-                  const placesWithCategory = filteredResults.map((place: any) => ({
-                    ...place,
-                    category: category, // Use original category (Hotel, Aparthotel)
-                    google_type: googleType,
-                    search_point: pointIndex + 1
-                  }));
+                  // Filter by actual distance from center point
+                  const placesWithinRadius = filteredResults.filter((place: any) => {
+                    if (!place.geometry?.location) return false;
+                    
+                    const placeLat = place.geometry.location.lat;
+                    const placeLng = place.geometry.location.lng;
+                    
+                    // Calculate distance from center point
+                    const distance = calculateDistance(center.lat, center.lng, placeLat, placeLng);
+                    
+                    // Only include if within the specified radius
+                    return distance <= searchData.radius;
+                  });
                   
-                  allPlaces.push(...placesWithCategory);
+                  console.log(`📏 Distance filter: ${filteredResults.length} → ${placesWithinRadius.length} within ${searchData.radius}m radius`);
+                  
+                  if (placesWithinRadius.length > 0) {
+                    // Add the ORIGINAL category (not Google's generic type)
+                    const placesWithCategory = placesWithinRadius.map((place: any) => ({
+                      ...place,
+                      category: category, // Use original category (Hotel, Aparthotel)
+                      google_type: googleType,
+                      search_point: pointIndex + 1
+                    }));
+                    
+                    allPlaces.push(...placesWithCategory);
+                  }
                   console.log(`✅ Found ${placesWithCategory.length} ${category} places at point ${pointIndex + 1}`);
                 } else {
                   console.log(`⚠️ No ${category} results after filtering at point ${pointIndex + 1}`);
@@ -298,6 +316,18 @@ function deduplicatePlaces(places: any[]) {
     seen.add(place.place_id);
     return true;
   });
+}
+
+// Calculate distance between two points using Haversine formula
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in meters
 }
 
 function extractCity(addressComponents: any[]) {

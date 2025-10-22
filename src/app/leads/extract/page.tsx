@@ -299,6 +299,9 @@ export default function ExtractLeadsPage() {
       
         // Trigger the actual scraping process
         await triggerScraping(savedSearch.id);
+        
+        // Redirect to search history page
+        router.push('/leads/history');
       } else {
         // Show error notification if search couldn't be saved
         addNotification({
