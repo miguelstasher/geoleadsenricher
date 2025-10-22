@@ -49,55 +49,8 @@ export async function POST(request: NextRequest) {
       searchId,
       searchData
     };
-    // Try Supabase Edge Function first, fallback to original system
-    const SUPABASE_FUNCTION_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/google-maps-extraction`;
-    
-    const functionPayload = {
-      searchId: searchId,
-      searchData: searchData
-    };
-
-    try {
-      // Try Supabase Edge Function (no timeout limits!)
-      const jobResponse = await fetch(SUPABASE_FUNCTION_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify(functionPayload)
-      });
-
-      if (jobResponse.ok) {
-        console.log('✅ Supabase Edge Function started successfully');
-        
-        // Update search status to in_process (Edge Function will complete it)
-        const { error: updateError } = await supabase
-          .from('search_history')
-          .update({ 
-            status: 'in_process',
-            processing_started_at: new Date().toISOString()
-          })
-          .eq('id', searchId);
-        
-        if (updateError) {
-          console.error('❌ Error updating status to in_process:', updateError);
-        } else {
-          console.log('✅ Status updated to in_process');
-        }
-        
-        return NextResponse.json({ 
-          success: true, 
-          message: 'Google Maps extraction started successfully',
-          searchId: searchId
-        });
-      } else {
-        const errorText = await jobResponse.text();
-        console.log('⚠️ Supabase Edge Function failed:', errorText);
-      }
-    } catch (error) {
-      console.log('⚠️ Supabase Edge Function error, falling back to original system:', error);
-    }
+    // Skip Edge Function and use direct extraction immediately
+    console.log('🔄 Using direct extraction method (bypassing Edge Function)');
 
     // Fallback: Use direct extraction method (guaranteed to work)
     console.log('⚠️ Using direct extraction method as fallback');
