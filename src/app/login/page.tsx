@@ -110,7 +110,7 @@ export default function LoginPage() {
           <h2 className="mt-6 text-4xl font-bold text-white">
             Welcome back
           </h2>
-          <p className="mt-2 text-lg text-slate-300">
+          <p className="mt-2 text-lg text-white">
             Sign in to your GeoLeads account
           </p>
         </div>
@@ -257,17 +257,17 @@ export default function LoginPage() {
           )}
 
           <div className="text-center">
-            <p className="text-lg text-slate-300">
+            <p className="text-lg text-white">
               Don't have an account?{' '}
-              <Link href="/signup" className="font-medium text-purple-300 hover:text-purple-200 transition-colors duration-200 underline decoration-2 underline-offset-2">
+              <Link href="/signup" className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2">
                 Sign up here
               </Link>
             </p>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-white">
               Forgot your password?{' '}
               <button
                 onClick={() => setShowForgotPassword(true)}
-                className="font-medium text-purple-300 hover:text-purple-200 transition-colors duration-200 underline decoration-2 underline-offset-2"
+                className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2"
               >
                 Reset it here
               </button>
