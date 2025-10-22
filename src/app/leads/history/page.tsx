@@ -380,35 +380,60 @@ const SearchHistoryPage = () => {
     }
   };
 
-  // Fix stuck searches
-  const handleFixStuckSearches = async () => {
-    try {
-      const response = await fetch('/api/fix-stuck-searches', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+  // Delete stuck searches directly
+  const handleDeleteStuckSearches = async () => {
+    if (!confirm('Are you sure you want to delete all stuck "Processing..." searches? This action cannot be undone.')) {
+      return;
+    }
 
-      if (!response.ok) {
-        throw new Error('Failed to fix stuck searches');
+    try {
+      // Get all stuck searches
+      const { data: stuckSearches, error: fetchError } = await supabase
+        .from('search_history')
+        .select('*')
+        .eq('status', 'in_process');
+
+      if (fetchError) {
+        throw fetchError;
       }
 
-      const result = await response.json();
-      
+      if (!stuckSearches || stuckSearches.length === 0) {
+        addNotification({
+          title: 'No Stuck Searches',
+          message: 'No stuck searches found to delete.',
+          type: 'info'
+        });
+        return;
+      }
+
+      // Delete each stuck search
+      let deletedCount = 0;
+      for (const search of stuckSearches) {
+        const { error: deleteError } = await supabase
+          .from('search_history')
+          .delete()
+          .eq('id', search.id);
+
+        if (deleteError) {
+          console.error(`Error deleting search ${search.id}:`, deleteError);
+        } else {
+          deletedCount++;
+        }
+      }
+
       addNotification({
-        title: 'Stuck Searches Fixed',
-        message: `Fixed ${result.fixed} stuck searches`,
+        title: 'Stuck Searches Deleted',
+        message: `Deleted ${deletedCount} stuck searches`,
         type: 'success'
       });
 
       // Reload the search history
       loadSearchHistory();
     } catch (error) {
-      console.error('Error fixing stuck searches:', error);
+      console.error('Error deleting stuck searches:', error);
       addNotification({
-        title: 'Fix Failed',
-        message: 'Failed to fix stuck searches. Please try again.',
+        title: 'Delete Failed',
+        message: 'Failed to delete stuck searches. Please try again.',
         type: 'error'
       });
     }
