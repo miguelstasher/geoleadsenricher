@@ -82,7 +82,8 @@ export async function middleware(request: NextRequest) {
     '/api/delete-stuck-searches',
     '/api/manual-fix-status',
     '/api/retry-stuck-search',
-    '/api/fix-stuck-searches'
+    '/api/fix-stuck-searches',
+    '/api/users'
   ]
   
   const isAllowedApiRoute = allowedApiRoutes.some(route => 

@@ -270,14 +270,11 @@ const SearchHistoryPage = () => {
     
     // Auto-refresh every 10 seconds to catch status updates, but only if there are searches in progress
     const interval = setInterval(() => {
-      const hasInProgressSearches = searchHistory.some(item => item.status === 'in_process');
-      if (hasInProgressSearches) {
-        loadSearchHistory();
-      }
-    }, 10000); // Refresh every 10 seconds, but only when needed
+      loadSearchHistory();
+    }, 10000); // Refresh every 10 seconds
 
     return () => clearInterval(interval);
-  }, [searchHistory]);
+  }, []);
 
   // Retry failed search
   const handleRetrySearch = async (item: SearchHistoryItem) => {
