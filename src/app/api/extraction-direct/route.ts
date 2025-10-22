@@ -288,15 +288,17 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌ Direct extraction error:', error);
     
-    // Update search status to failed
-    await supabase
-      .from('search_history')
-      .update({ 
-        status: 'failed',
-        error_message: error instanceof Error ? error.message : 'Unknown error',
-        failed_at: new Date().toISOString()
-      })
-      .eq('id', searchId);
+    // Update search status to failed (only if searchId is available)
+    if (searchId) {
+      await supabase
+        .from('search_history')
+        .update({ 
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+          failed_at: new Date().toISOString()
+        })
+        .eq('id', searchId);
+    }
     
     return NextResponse.json({
       error: 'Direct extraction failed',
