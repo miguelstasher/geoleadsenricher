@@ -39,20 +39,11 @@ export default function RootLayout({
               background-color: #ffffff !important;
             }
             
-            /* ULTRA-AGGRESSIVE WHITE BACKGROUND - FORCE EVERYWHERE */
-            body, html, #__next, main, div, section, article, aside, header, footer {
-              background: #ffffff !important;
-              background-color: #ffffff !important;
-            }
+            /* TARGETED WHITE BACKGROUND - ONLY DASHBOARD */
+            /* Don't override login/signup pages */
             
-            /* NUCLEAR OPTION - FORCE WHITE ON EVERYTHING */
-            *, *::before, *::after {
-              background: #ffffff !important;
-              background-color: #ffffff !important;
-            }
-            
-            /* Override any dark themes completely */
-            .dark, [data-theme="dark"], .bg-gray-900, .bg-gray-800, .bg-black, .bg-slate-900, .bg-slate-800 {
+            /* Override dark themes ONLY on dashboard pages */
+            main .dark, main [data-theme="dark"], main .bg-gray-900, main .bg-gray-800, main .bg-black, main .bg-slate-900, main .bg-slate-800 {
               background: #ffffff !important;
               background-color: #ffffff !important;
             }
@@ -135,20 +126,17 @@ export default function RootLayout({
               color: #111827 !important;
             }
             
-            /* NUCLEAR DASHBOARD FIX - ELIMINATE ALL BLACK */
-            .space-y-6, .min-h-screen, main, body, html {
+            /* DASHBOARD-SPECIFIC WHITE BACKGROUND FIX */
+            /* Only apply white background to dashboard page, not login/signup */
+            main .min-h-screen.bg-white,
+            main .space-y-6,
+            main .space-y-8 {
               background: #ffffff !important;
               background-color: #ffffff !important;
             }
             
-            /* FORCE WHITE BACKGROUND ON ALL PAGE CONTAINERS */
-            .min-h-screen, .space-y-6, .space-y-8 {
-              background: #ffffff !important;
-              background-color: #ffffff !important;
-            }
-            
-            /* OVERRIDE GRAY BACKGROUNDS */
-            .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100 {
+            /* OVERRIDE GRAY BACKGROUNDS ONLY ON DASHBOARD */
+            main .bg-gray-50, main .bg-gray-100, main .bg-slate-50, main .bg-slate-100 {
               background: #ffffff !important;
               background-color: #ffffff !important;
             }
