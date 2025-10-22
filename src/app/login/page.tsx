@@ -107,10 +107,10 @@ export default function LoginPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          <h2 className="mt-6 text-4xl font-bold text-white" style={{color: '#ffffff !important'}}>
+          <h2 className="mt-6 text-4xl font-bold" style={{color: '#ffffff !important', textShadow: '0 0 10px rgba(255,255,255,0.3)'}}>
             Welcome back
           </h2>
-          <p className="mt-2 text-lg text-white" style={{color: '#ffffff !important'}}>
+          <p className="mt-2 text-lg" style={{color: '#ffffff !important', textShadow: '0 0 10px rgba(255,255,255,0.3)'}}>
             Sign in to your GeoLeads account
           </p>
         </div>
@@ -194,12 +194,7 @@ export default function LoginPage() {
                     Signing in...
                   </div>
                 ) : (
-                  <>
-                    <span>Sign in</span>
-                    <svg className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
-                  </>
+                  <span>Sign in</span>
                 )}
               </button>
             </div>
@@ -257,18 +252,18 @@ export default function LoginPage() {
           )}
 
           <div className="text-center">
-            <p className="text-lg text-white" style={{color: '#ffffff !important'}}>
+            <p className="text-lg" style={{color: '#ffffff !important', textShadow: '0 0 10px rgba(255,255,255,0.3)'}}>
               Don't have an account?{' '}
-              <Link href="/signup" className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2" style={{color: '#e879f9 !important'}}>
+              <Link href="/signup" className="font-medium transition-colors duration-200 underline decoration-2 underline-offset-2" style={{color: '#e879f9 !important', textShadow: '0 0 10px rgba(232,121,249,0.5)'}}>
                 Sign up here
               </Link>
             </p>
-            <p className="mt-2 text-sm text-white" style={{color: '#ffffff !important'}}>
+            <p className="mt-2 text-sm" style={{color: '#ffffff !important', textShadow: '0 0 10px rgba(255,255,255,0.3)'}}>
               Forgot your password?{' '}
               <button
                 onClick={() => setShowForgotPassword(true)}
-                className="font-medium text-purple-200 hover:text-purple-100 transition-colors duration-200 underline decoration-2 underline-offset-2"
-                style={{color: '#e879f9 !important'}}
+                className="font-medium transition-colors duration-200 underline decoration-2 underline-offset-2"
+                style={{color: '#e879f9 !important', textShadow: '0 0 10px rgba(232,121,249,0.5)'}}
               >
                 Reset it here
               </button>
